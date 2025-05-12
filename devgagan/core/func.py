@@ -1,13 +1,13 @@
 # ---------------------------------------------------
 # File Name: get_func.py
-# Description: A Pyrogram bot for downloading files from Telegram channels or groups
+# Description: A Pyrogram bot for downloading files from Telegram channels or groups 
 #              and uploading them back to Telegram.
 # Author: Gagan
 # GitHub: https://github.com/devgaganin/
 # Telegram: https://t.me/team_spy_pro
 # YouTube: https://youtube.com/@dev_gagan
 # Created: 2025-01-11
-# Last Modified: 2025-05-12 # Updated last modified date
+# Last Modified: 2025-02-01
 # Version: 2.0.5
 # License: MIT License
 # Improved logic handles
@@ -55,17 +55,13 @@ if STRING:
 else:
     pro = None
     print("STRING is not available. 'app' is set to None.")
-
+    
 async def fetch_upload_method(user_id):
     """Fetch the user's preferred upload method."""
-    print(f"DEBUG: Fetching upload method for user {user_id}") # Debug log
     user_data = collection.find_one({"user_id": user_id})
-    method = user_data.get("upload_method", "Pyrogram") if user_data else "Pyrogram"
-    print(f"DEBUG: Upload method for user {user_id} is {method}") # Debug log
-    return method
+    return user_data.get("upload_method", "Pyrogram") if user_data else "Pyrogram"
 
 async def format_caption_to_html(caption: str) -> str:
-    # ... (your existing format_caption_to_html function) ...
     caption = re.sub(r"^> (.*)", r"<blockquote>\1</blockquote>", caption, flags=re.MULTILINE)
     caption = re.sub(r"```(.*?)```", r"<pre>\1</pre>", caption, flags=re.DOTALL)
     caption = re.sub(r"`(.*?)`", r"<code>\1</code>", caption)
@@ -74,30 +70,26 @@ async def format_caption_to_html(caption: str) -> str:
     caption = re.sub(r"__(.*?)__", r"<i>\1</i>", caption)
     caption = re.sub(r"_(.*?)_", r"<i>\1</i>", caption)
     caption = re.sub(r"~~(.*?)~~", r"<s>\1</s>", caption)
-    caption = re.sub(r"\|\|(.*?)\|\|", r"<details>\1</details>") # Corrected regex for spoiler
+    caption = re.sub(r"\|\|(.*?)\|\|", r"<details>\1</details>", caption)
     caption = re.sub(r"\[(.*?)\]\((.*?)\)", r'<a href="\2">\1</a>', caption)
     return caption.strip() if caption else None
+    
 
 
 async def upload_media(sender, target_chat_id, file, caption, edit, topic_id):
-    print(f"DEBUG: Starting upload_media for file: {file}") # Debug log
     try:
         upload_method = await fetch_upload_method(sender)  # Fetch the upload method (Pyrogram or Telethon)
-        print(f"DEBUG: Upload method selected: {upload_method}") # Debug log
         metadata = video_metadata(file)
         width, height, duration = metadata['width'], metadata['height'], metadata['duration']
         thumb_path = await screenshot(file, duration, sender)
-        print(f"DEBUG: Thumbnail path: {thumb_path}") # Debug log
 
         video_formats = {'mp4', 'mkv', 'avi', 'mov'}
-        document_formats = {'pdf', 'docx', 'txt', 'epub'} # Defined but not used in upload logic below
+        document_formats = {'pdf', 'docx', 'txt', 'epub'}
         image_formats = {'jpg', 'png', 'jpeg'}
 
         # Pyrogram upload
         if upload_method == "Pyrogram":
-            print("DEBUG: Using Pyrogram upload method.") # Debug log
             if file.split('.')[-1].lower() in video_formats:
-                print(f"DEBUG: Sending video with Pyrogram to {target_chat_id}") # Debug log
                 dm = await app.send_video(
                     chat_id=target_chat_id,
                     video=file,
@@ -109,14 +101,11 @@ async def upload_media(sender, target_chat_id, file, caption, edit, topic_id):
                     reply_to_message_id=topic_id,
                     parse_mode=ParseMode.MARKDOWN,
                     progress=progress_bar,
-                    progress_args=("╭─────────────────────╮\n│       **__Pyro Uploader__**\n├─────────────────────", edit, time.time())
+                    progress_args=("╭─────────────────────╮\n│      **__Pyro Uploader__**\n├─────────────────────", edit, time.time())
                 )
-                print(f"DEBUG: Video sent. Copying to LOG_GROUP: {LOG_GROUP}") # Debug log
                 await dm.copy(LOG_GROUP)
-                print("DEBUG: Video copied to LOG_GROUP.") # Debug log
-
+                
             elif file.split('.')[-1].lower() in image_formats:
-                print(f"DEBUG: Sending photo with Pyrogram to {target_chat_id}") # Debug log
                 dm = await app.send_photo(
                     chat_id=target_chat_id,
                     photo=file,
@@ -124,13 +113,10 @@ async def upload_media(sender, target_chat_id, file, caption, edit, topic_id):
                     parse_mode=ParseMode.MARKDOWN,
                     progress=progress_bar,
                     reply_to_message_id=topic_id,
-                    progress_args=("╭─────────────────────╮\n│       **__Pyro Uploader__**\n├─────────────────────", edit, time.time())
+                    progress_args=("╭─────────────────────╮\n│      **__Pyro Uploader__**\n├─────────────────────", edit, time.time())
                 )
-                print(f"DEBUG: Photo sent. Copying to LOG_GROUP: {LOG_GROUP}") # Debug log
                 await dm.copy(LOG_GROUP)
-                print("DEBUG: Photo copied to LOG_GROUP.") # Debug log
-            else: # Handles documents and other file types not explicitly listed
-                print(f"DEBUG: Sending document with Pyrogram to {target_chat_id}") # Debug log
+            else:
                 dm = await app.send_document(
                     chat_id=target_chat_id,
                     document=file,
@@ -139,28 +125,22 @@ async def upload_media(sender, target_chat_id, file, caption, edit, topic_id):
                     reply_to_message_id=topic_id,
                     progress=progress_bar,
                     parse_mode=ParseMode.MARKDOWN,
-                    progress_args=("╭─────────────────────╮\n│       **__Pyro Uploader__**\n├─────────────────────", edit, time.time())
+                    progress_args=("╭─────────────────────╮\n│      **__Pyro Uploader__**\n├─────────────────────", edit, time.time())
                 )
-                print("DEBUG: Document sent. Waiting 2 seconds before copying...") # Debug log
-                await asyncio.sleep(2) # Added a small delay as seen in your original code
-                print(f"DEBUG: Copying document to LOG_GROUP: {LOG_GROUP}") # Debug log
+                await asyncio.sleep(2)
                 await dm.copy(LOG_GROUP)
-                print("DEBUG: Document copied to LOG_GROUP.") # Debug log
 
         # Telethon upload
         elif upload_method == "Telethon":
-            print("DEBUG: Using Telethon upload method.") # Debug log
             await edit.delete()
             progress_message = await gf.send_message(sender, "**__Uploading...__**")
-            caption = await format_caption_to_html(caption) # Assuming this is for Telethon
-            print("DEBUG: Starting fast_upload with Telethon.") # Debug log
+            caption = await format_caption_to_html(caption)
             uploaded = await fast_upload(
                 gf, file,
                 reply=progress_message,
                 name=None,
                 progress_bar_function=lambda done, total: progress_callback(done, total, sender)
             )
-            print(f"DEBUG: fast_upload complete. Uploaded file object: {uploaded}") # Debug log
             await progress_message.delete()
 
             attributes = [
@@ -171,7 +151,7 @@ async def upload_media(sender, target_chat_id, file, caption, edit, topic_id):
                     supports_streaming=True
                 )
             ] if file.split('.')[-1].lower() in video_formats else []
-            print(f"DEBUG: Sending file with Telethon to {target_chat_id}") # Debug log
+
             await gf.send_file(
                 target_chat_id,
                 uploaded,
@@ -180,7 +160,6 @@ async def upload_media(sender, target_chat_id, file, caption, edit, topic_id):
                 reply_to=topic_id,
                 thumb=thumb_path
             )
-            print(f"DEBUG: File sent with Telethon. Sending copy to LOG_GROUP: {LOG_GROUP}") # Debug log
             await gf.send_file(
                 LOG_GROUP,
                 uploaded,
@@ -188,33 +167,18 @@ async def upload_media(sender, target_chat_id, file, caption, edit, topic_id):
                 attributes=attributes,
                 thumb=thumb_path
             )
-            print("DEBUG: File copied to LOG_GROUP with Telethon.") # Debug log
 
     except Exception as e:
-        print(f"DEBUG: Exception caught in upload_media: {e}") # Debug log
-        # Sending error message to LOG_GROUP here might help if the error happens *before* the copy/send_file
-        try:
-            await app.send_message(LOG_GROUP, f"**Upload Failed:** {str(e)}\nFile: `{file}`")
-            print("DEBUG: Error message sent to LOG_GROUP.") # Debug log
-        except Exception as log_e:
-            print(f"DEBUG: Failed to send error message to LOG_GROUP: {log_e}") # Debug log
+        await app.send_message(LOG_GROUP, f"**Upload Failed:** {str(e)}")
         print(f"Error during media upload: {e}")
 
     finally:
-        print(f"DEBUG: upload_media finally block for file: {file}") # Debug log
         if thumb_path and os.path.exists(thumb_path):
-            print(f"DEBUG: Removing thumbnail: {thumb_path}") # Debug log
             os.remove(thumb_path)
-        # File removal is handled in get_msg, but adding a check here too might help
-        # if file and os.path.exists(file):
-        #     print(f"DEBUG: Removing file: {file}") # Debug log
-        #     os.remove(file)
         gc.collect()
-        print("DEBUG: upload_media finally block finished.") # Debug log
 
 
 async def get_msg(userbot, sender, edit_id, msg_link, i, message):
-    print(f"DEBUG: Starting get_msg for link: {msg_link}") # Debug log
     try:
         # Sanitize the message link
         msg_link = msg_link.split("?single")[0]
@@ -223,230 +187,151 @@ async def get_msg(userbot, sender, edit_id, msg_link, i, message):
         size_limit = 2 * 1024 * 1024 * 1024  # 1.99 GB size limit
         file = ''
         edit = ''
-        print(f"DEBUG: Processed link: {msg_link}") # Debug log
-
         # Extract chat and message ID for valid Telegram links
         if 't.me/c/' in msg_link or 't.me/b/' in msg_link:
-            print("DEBUG: Detected t.me/c/ or t.me/b/ link.") # Debug log
             parts = msg_link.split("/")
             if 't.me/b/' in msg_link:
                 chat = parts[-2]
-                msg_id = int(parts[-1]) + i # fixed bot problem
+                msg_id = int(parts[-1]) + i # fixed bot problem 
             else:
                 chat = int('-100' + parts[parts.index('c') + 1])
                 msg_id = int(parts[-1]) + i
 
-            print(f"DEBUG: Extracted chat: {chat}, msg_id: {msg_id}") # Debug log
-
             if chat in saved_channel_ids:
-                print(f"DEBUG: Chat {chat} is in saved_channel_ids. Aborting.") # Debug log
                 await app.edit_message_text(
                     message.chat.id, edit_id,
                     "Sorry! This channel is protected by **Admin**."
                 )
                 return
-
+            
         elif '/s/' in msg_link: # fixed story typo
-            print("DEBUG: Detected story link.") # Debug log
-            edit = await app.edit_message_text(sender, edit_id, "Story Link Detected...")
+            edit = await app.edit_message_text(sender, edit_id, "Story Link Dictected...")
             if userbot is None:
-                print("DEBUG: userbot is None for story link. Aborting.") # Debug log
-                await edit.edit("Login in bot save stories...")
+                await edit.edit("Login in bot save stories...")     
                 return
             parts = msg_link.split("/")
             chat = parts[3]
-
-            if chat.isdigit():  # this is for channel stories
+            
+            if chat.isdigit():   # this is for channel stories
                 chat = f"-100{chat}"
-
+            
             msg_id = int(parts[-1])
-            print(f"DEBUG: Extracted story chat: {chat}, msg_id: {msg_id}") # Debug log
             await download_user_stories(userbot, chat, msg_id, edit, sender)
             await edit.delete(2)
-            print("DEBUG: Story processing finished.") # Debug log
             return
-
+        
         else:
-            print("DEBUG: Detected public link.") # Debug log
             edit = await app.edit_message_text(sender, edit_id, "Public link detected...")
             chat = msg_link.split("t.me/")[1].split("/")[0]
             msg_id = int(msg_link.split("/")[-1])
-            print(f"DEBUG: Extracted public chat: {chat}, msg_id: {msg_id}") # Debug log
             await copy_message_with_chat_id(app, userbot, sender, chat, msg_id, edit)
             await edit.delete(2)
-            print("DEBUG: Public link processing finished.") # Debug log
-            return # Exit after handling public link
-
-        # Fetch the target message (only for t.me/c/ or t.me/b/ links now)
-        print(f"DEBUG: Fetching message {msg_id} from chat {chat} using userbot.") # Debug log
+            return
+            
+        # Fetch the target message
         msg = await userbot.get_messages(chat, msg_id)
         if not msg or msg.service or msg.empty:
-            print("DEBUG: Message not found, is service message, or is empty. Aborting.") # Debug log
-            # Consider editing the message to inform the user
-            await app.edit_message_text(sender, edit_id, "Could not fetch the message.")
             return
 
         target_chat_id = user_chat_ids.get(message.chat.id, message.chat.id)
         topic_id = None
         if '/' in str(target_chat_id):
-            target_chat_id, topic_id = map(int, str(target_chat_id).split('/', 1)) # Ensure target_chat_id is string
-        print(f"DEBUG: Target chat ID: {target_chat_id}, Topic ID: {topic_id}") # Debug log
-
+            target_chat_id, topic_id = map(int, target_chat_id.split('/', 1))
 
         # Handle different message types
         if msg.media == MessageMediaType.WEB_PAGE_PREVIEW:
-            print("DEBUG: Detected WEB_PAGE_PREVIEW.") # Debug log
             await clone_message(app, msg, target_chat_id, topic_id, edit_id, LOG_GROUP)
-            print("DEBUG: WEB_PAGE_PREVIEW processing finished.") # Debug log
             return
 
         if msg.text:
-            print("DEBUG: Detected text message.") # Debug log
             await clone_text_message(app, msg, target_chat_id, topic_id, edit_id, LOG_GROUP)
-            print("DEBUG: Text message processing finished.") # Debug log
             return
 
         if msg.sticker:
-            print("DEBUG: Detected sticker.") # Debug log
             await handle_sticker(app, msg, target_chat_id, topic_id, edit_id, LOG_GROUP)
-            print("DEBUG: Sticker processing finished.") # Debug log
             return
 
-
-        # Handle file media (photo, document, video, audio, voice)
-        print("DEBUG: Detected file media (photo, document, video, audio, voice).") # Debug log
+        
+        # Handle file media (photo, document, video)
         file_size = get_message_file_size(msg)
-        print(f"DEBUG: File size: {file_size}") # Debug log
 
-        size_limit_pro = 4 * 1024 * 1024 * 1024 # Assuming 4GB limit for pro
-        if file_size and file_size > size_limit_pro and pro is None:
-             print(f"DEBUG: File size {file_size} exceeds {size_limit_pro} and pro is None. Aborting.") # Debug log
-             await app.edit_message_text(sender, edit_id, "**❌ 4GB Uploader not found**")
-             return
+        if file_size and file_size > size_limit and pro is None:
+            await app.edit_message_text(sender, edit_id, "**❌ 4GB Uploader not found**")
+            return
 
         file_name = await get_media_filename(msg)
         edit = await app.edit_message_text(sender, edit_id, "**Downloading...**")
-        print(f"DEBUG: Starting download for file: {file_name}") # Debug log
 
         # Download media
         file = await userbot.download_media(
             msg,
             file_name=file_name,
             progress=progress_bar,
-            progress_args=("╭─────────────────────╮\n│       **__Downloading__...**\n├─────────────────────", edit, time.time())
+            progress_args=("╭─────────────────────╮\n│      **__Downloading__...**\n├─────────────────────", edit, time.time())
         )
-        print(f"DEBUG: Download complete. File saved to: {file}") # Debug log
-
+        
         caption = await get_final_caption(msg, sender)
-        print(f"DEBUG: Final caption: {caption}") # Debug log
 
         # Rename file
         file = await rename_file(file, sender)
-        print(f"DEBUG: File renamed to: {file}") # Debug log
-
-        # Handle specific media types after download
         if msg.audio:
-            print(f"DEBUG: Sending audio to {target_chat_id}") # Debug log
             result = await app.send_audio(target_chat_id, file, caption=caption, reply_to_message_id=topic_id)
-            print("DEBUG: Audio sent. Copying to LOG_GROUP.") # Debug log
             await result.copy(LOG_GROUP)
-            print("DEBUG: Audio copied to LOG_GROUP.") # Debug log
             await edit.delete(2)
-            print("DEBUG: Audio processing finished.") # Debug log
             return
-
+        
         if msg.voice:
-            print(f"DEBUG: Sending voice to {target_chat_id}") # Debug log
             result = await app.send_voice(target_chat_id, file, reply_to_message_id=topic_id)
-            print("DEBUG: Voice sent. Copying to LOG_GROUP.") # Debug log
             await result.copy(LOG_GROUP)
-            print("DEBUG: Voice copied to LOG_GROUP.") # Debug log
             await edit.delete(2)
-            print("DEBUG: Voice processing finished.") # Debug log
             return
 
         if msg.photo:
-            print(f"DEBUG: Sending photo to {target_chat_id}") # Debug log
             result = await app.send_photo(target_chat_id, file, caption=caption, reply_to_message_id=topic_id)
-            print("DEBUG: Photo sent. Copying to LOG_GROUP.") # Debug log
             await result.copy(LOG_GROUP)
-            print("DEBUG: Photo copied to LOG_GROUP.") # Debug log
             await edit.delete(2)
-            print("DEBUG: Photo processing finished.") # Debug log
             return
 
-        # Handle video and document uploads (potentially large files)
-        print("DEBUG: Handling video or document upload.") # Debug log
-        if file_size > size_limit: # Using the 1.99 GB limit defined earlier
-             print(f"DEBUG: File size {file_size} exceeds {size_limit}. Handling as large file.") # Debug log
-             await handle_large_file(file, sender, edit, caption)
-             print("DEBUG: handle_large_file finished.") # Debug log
+        # Upload media
+        # await edit.edit("**Checking file...**")
+        if file_size > size_limit:
+            await handle_large_file(file, sender, edit, caption)
         else:
-             print(f"DEBUG: File size {file_size} is within limit. Calling upload_media.") # Debug log
-             await upload_media(sender, target_chat_id, file, caption, edit, topic_id)
-             print("DEBUG: upload_media finished.") # Debug log
+            await upload_media(sender, target_chat_id, file, caption, edit, topic_id)
 
-
-    except (ChannelBanned, ChannelInvalid, ChannelPrivate, ChatIdInvalid, ChatInvalid) as e:
-        print(f"DEBUG: Caught Telegram Channel/Chat exception: {e}") # Debug log
+    except (ChannelBanned, ChannelInvalid, ChannelPrivate, ChatIdInvalid, ChatInvalid):
         await app.edit_message_text(sender, edit_id, "Have you joined the channel?")
     except Exception as e:
-        print(f"DEBUG: Caught general exception in get_msg: {e}") # Debug log
         # await app.edit_message_text(sender, edit_id, f"Failed to save: `{msg_link}`\n\nError: {str(e)}")
         print(f"Error: {e}")
-        # Consider sending a more specific error message to the user
-        # await app.send_message(sender, f"An error occurred while processing your link: {e}")
     finally:
-        print(f"DEBUG: get_msg finally block for link: {msg_link}") # Debug log
-        # Clean up the downloaded file
+        # Clean up
         if file and os.path.exists(file):
-            print(f"DEBUG: Removing downloaded file: {file}") # Debug log
             os.remove(file)
         if edit:
-            # Ensure edit message is deleted even if there was an error
-            try:
-                await edit.delete(2)
-                print("DEBUG: Edit message deleted in finally block.") # Debug log
-            except Exception as delete_e:
-                print(f"DEBUG: Failed to delete edit message in finally block: {delete_e}") # Debug log
-        gc.collect()
-        print("DEBUG: get_msg finally block finished.") # Debug log
-
-
+            await edit.delete(2)
+        
 async def clone_message(app, msg, target_chat_id, topic_id, edit_id, log_group):
-    print("DEBUG: Cloning message (web page preview).") # Debug log
     edit = await app.edit_message_text(target_chat_id, edit_id, "Cloning...")
     devgaganin = await app.send_message(target_chat_id, msg.text.markdown, reply_to_message_id=topic_id)
-    print(f"DEBUG: Cloned message sent. Copying to log group: {log_group}") # Debug log
     await devgaganin.copy(log_group)
-    print("DEBUG: Cloned message copied to log group.") # Debug log
     await edit.delete()
-    print("DEBUG: clone_message finished.") # Debug log
 
 async def clone_text_message(app, msg, target_chat_id, topic_id, edit_id, log_group):
-    print("DEBUG: Cloning text message.") # Debug log
     edit = await app.edit_message_text(target_chat_id, edit_id, "Cloning text message...")
     devgaganin = await app.send_message(target_chat_id, msg.text.markdown, reply_to_message_id=topic_id)
-    print(f"DEBUG: Cloned text message sent. Copying to log group: {log_group}") # Debug log
     await devgaganin.copy(log_group)
-    print("DEBUG: Cloned text message copied to log group.") # Debug log
     await edit.delete()
-    print("DEBUG: clone_text_message finished.") # Debug log
 
 
 async def handle_sticker(app, msg, target_chat_id, topic_id, edit_id, log_group):
-    print("DEBUG: Handling sticker.") # Debug log
     edit = await app.edit_message_text(target_chat_id, edit_id, "Handling sticker...")
     result = await app.send_sticker(target_chat_id, msg.sticker.file_id, reply_to_message_id=topic_id)
-    print(f"DEBUG: Sticker sent. Copying to log group: {log_group}") # Debug log
     await result.copy(log_group)
-    print("DEBUG: Sticker copied to log group.") # Debug log
     await edit.delete()
-    print("DEBUG: handle_sticker finished.") # Debug log
 
 
 async def get_media_filename(msg):
-    # ... (your existing get_media_filename function) ...
     if msg.document:
         return msg.document.file_name
     if msg.video:
@@ -456,257 +341,163 @@ async def get_media_filename(msg):
     return "unknown_file"
 
 def get_message_file_size(msg):
-    # ... (your existing get_message_file_size function) ...
     if msg.document:
         return msg.document.file_size
     if msg.photo:
         return msg.photo.file_size
     if msg.video:
         return msg.video.file_size
-    return 1 # Return a small size if no media with size is found
+    return 1
 
 async def get_final_caption(msg, sender):
-    # ... (your existing get_final_caption function) ...
     # Handle caption based on the upload method
     if msg.caption:
         original_caption = msg.caption.markdown
     else:
         original_caption = ""
-
+    
     custom_caption = get_user_caption_preference(sender)
     final_caption = f"{original_caption}\n\n{custom_caption}" if custom_caption else original_caption
     replacements = load_replacement_words(sender)
     for word, replace_word in replacements.items():
         final_caption = final_caption.replace(word, replace_word)
-
+        
     return final_caption if final_caption else None
 
 
 async def download_user_stories(userbot, chat_id, msg_id, edit, sender):
-    # ... (your existing download_user_stories function) ...
     try:
-        print(f"DEBUG: Downloading story for chat {chat_id}, msg_id {msg_id}") # Debug log
         # Fetch the story using the provided chat ID and message ID
         story = await userbot.get_stories(chat_id, msg_id)
         if not story:
-            print("DEBUG: No story available.") # Debug log
             await edit.edit("No story available for this user.")
-            return
+            return  
         if not story.media:
-            print("DEBUG: Story has no media.") # Debug log
             await edit.edit("The story doesn't contain any media.")
             return
         await edit.edit("Downloading Story...")
         file_path = await userbot.download_media(story)
-        print(f"DEBUG: Story downloaded: {file_path}") # Debug log
+        print(f"Story downloaded: {file_path}")
         # Send the downloaded story based on its type
         if story.media:
             await edit.edit("Uploading Story...")
             if story.media == MessageMediaType.VIDEO:
-                print(f"DEBUG: Sending story video to {sender}") # Debug log
                 await app.send_video(sender, file_path)
             elif story.media == MessageMediaType.DOCUMENT:
-                 print(f"DEBUG: Sending story document to {sender}") # Debug log
-                 await app.send_document(sender, file_path)
+                await app.send_document(sender, file_path)
             elif story.media == MessageMediaType.PHOTO:
-                 print(f"DEBUG: Sending story photo to {sender}") # Debug log
-                 await app.send_photo(sender, file_path)
+                await app.send_photo(sender, file_path)
         if file_path and os.path.exists(file_path):
-            print(f"DEBUG: Removing story file: {file_path}") # Debug log
-            os.remove(file_path)
+            os.remove(file_path)  
         await edit.edit("Story processed successfully.")
-        print("DEBUG: download_user_stories finished.") # Debug log
     except RPCError as e:
-        print(f"DEBUG: RPCError in download_user_stories: {e}") # Debug log
         print(f"Failed to fetch story: {e}")
         await edit.edit(f"Error: {e}")
-    except Exception as e:
-        print(f"DEBUG: General exception in download_user_stories: {e}") # Debug log
-        print(f"Error: {e}")
-        await edit.edit(f"An unexpected error occurred: {e}")
-
-
+        
 async def copy_message_with_chat_id(app, userbot, sender, chat_id, message_id, edit):
-    print(f"DEBUG: Starting copy_message_with_chat_id for chat {chat_id}, msg_id {message_id}") # Debug log
     target_chat_id = user_chat_ids.get(sender, sender)
     file = None
     result = None
     size_limit = 2 * 1024 * 1024 * 1024  # 2 GB size limit
-    print(f"DEBUG: Target chat ID for copy: {target_chat_id}") # Debug log
 
     try:
-        print(f"DEBUG: Attempting app.get_messages for chat {chat_id}, msg_id {message_id}") # Debug log
         msg = await app.get_messages(chat_id, message_id)
-        print(f"DEBUG: Message fetched: {msg}") # Debug log
-
         custom_caption = get_user_caption_preference(sender)
         final_caption = format_caption(msg.caption or '', sender, custom_caption)
-        print(f"DEBUG: Final caption for copy: {final_caption}") # Debug log
 
         # Parse target_chat_id and topic_id
         topic_id = None
         if '/' in str(target_chat_id):
-            target_chat_id, topic_id = map(int, str(target_chat_id).split('/', 1))
-        print(f"DEBUG: Target chat ID (parsed): {target_chat_id}, Topic ID (parsed): {topic_id}") # Debug log
+            target_chat_id, topic_id = map(int, target_chat_id.split('/', 1))
 
         # Handle different media types
         if msg.media:
-            print("DEBUG: Detected media in copy_message_with_chat_id. Calling send_media_message.") # Debug log
             result = await send_media_message(app, target_chat_id, msg, final_caption, topic_id)
-            print("DEBUG: send_media_message finished. Returning.") # Debug log
-            return # Exit after handling media
-
+            return
         elif msg.text:
-            print("DEBUG: Detected text message in copy_message_with_chat_id. Calling app.copy_message.") # Debug log
             result = await app.copy_message(target_chat_id, chat_id, message_id, reply_to_message_id=topic_id)
-            print("DEBUG: app.copy_message finished. Returning.") # Debug log
-            return # Exit after handling text
+            return
 
-        # Fallback if result is None (This block might be for handling public group usernames that Pyrogram couldn't resolve directly)
+        # Fallback if result is None
         if result is None:
-             print("DEBUG: Result is None after initial copy/send attempts. Trying Telethon fallback.") # Debug log
-             await edit.edit("Trying if it is a group...")
-             # This line assumes chat_id is a username string if result is None
-             print(f"DEBUG: Attempting userbot.get_chat for username: @{chat_id}") # Debug log
-             chat_obj = await userbot.get_chat(f"@{chat_id}")
-             chat_id_int = chat_obj.id # Get integer ID from username
-             print(f"DEBUG: Resolved username @{chat_id} to integer ID: {chat_id_int}") # Debug log
+            await edit.edit("Trying if it is a group...")
+            chat_id = (await userbot.get_chat(f"@{chat_id}")).id
+            msg = await userbot.get_messages(chat_id, message_id)
 
-             print(f"DEBUG: Attempting userbot.get_messages for chat {chat_id_int}, msg_id {message_id}") # Debug log
-             msg = await userbot.get_messages(chat_id_int, message_id)
-             print(f"DEBUG: Message fetched via Telethon: {msg}") # Debug log
+            if not msg or msg.service or msg.empty:
+                return
 
-             if not msg or msg.service or msg.empty:
-                 print("DEBUG: Message not found, is service message, or is empty via Telethon. Aborting fallback.") # Debug log
-                 return
+            final_caption = format_caption(msg.caption.markdown if msg.caption else "", sender, custom_caption)
+            file = await userbot.download_media(
+                msg,
+                progress=progress_bar,
+                progress_args=("╭─────────────────────╮\n│      **__Downloading__...**\n├─────────────────────", edit, time.time())
+            )
+            file = await rename_file(file, sender)
 
-             final_caption = format_caption(msg.caption.markdown if msg.caption else "", sender, custom_caption)
-             print(f"DEBUG: Final caption for Telethon fallback: {final_caption}") # Debug log
-
-             edit = await app.edit_message_text(sender, edit.id, "**Downloading (Telethon Fallback)...**") # Update edit message
-             print(f"DEBUG: Starting download via Telethon fallback for file: {await get_media_filename(msg)}") # Debug log
-             file = await userbot.download_media(
-                 msg,
-                 progress=progress_bar,
-                 progress_args=("╭─────────────────────╮\n│       **__Downloading__...**\n├─────────────────────", edit, time.time())
-             )
-             print(f"DEBUG: Download complete via Telethon fallback. File: {file}") # Debug log
-             file = await rename_file(file, sender)
-             print(f"DEBUG: File renamed via Telethon fallback: {file}") # Debug log
-
-
-             if msg.photo:
-                 print(f"DEBUG: Sending photo via Pyrogram after Telethon download to {target_chat_id}") # Debug log
-                 result = await app.send_photo(target_chat_id, file, caption=final_caption, reply_to_message_id=topic_id)
-                 print("DEBUG: Photo sent via Pyrogram.") # Debug log
-             elif msg.video or msg.document:
-                 print(f"DEBUG: Handling video/document via Telethon fallback.") # Debug log
-                 if await is_file_size_exceeding(file, size_limit):
-                     print(f"DEBUG: File size {os.path.getsize(file)} exceeds {size_limit}. Handling as large file via fallback.") # Debug log
-                     await handle_large_file(file, sender, edit, final_caption)
-                     print("DEBUG: handle_large_file finished via fallback.") # Debug log
-                     return # Exit after handling large file
-                 print(f"DEBUG: File size {os.path.getsize(file)} is within limit. Calling upload_media via fallback.") # Debug log
-                 await upload_media(sender, target_chat_id, file, final_caption, edit, topic_id)
-                 print("DEBUG: upload_media finished via fallback.") # Debug log
-                 return # Exit after upload_media
-             elif msg.audio:
-                 print(f"DEBUG: Sending audio via Pyrogram after Telethon download to {target_chat_id}") # Debug log
-                 result = await app.send_audio(target_chat_id, file, caption=final_caption, reply_to_message_id=topic_id)
-                 print("DEBUG: Audio sent via Pyrogram.") # Debug log
-             elif msg.voice:
-                 print(f"DEBUG: Sending voice via Pyrogram after Telethon download to {target_chat_id}") # Debug log
-                 result = await app.send_voice(target_chat_id, file, reply_to_message_id=topic_id)
-                 print("DEBUG: Voice sent via Pyrogram.") # Debug log
-             elif msg.sticker:
-                 print(f"DEBUG: Sending sticker via Pyrogram after Telethon download to {target_chat_id}") # Debug log
-                 result = await app.send_sticker(target_chat_id, msg.sticker.file_id, reply_to_message_id=topic_id)
-                 print("DEBUG: Sticker sent via Pyrogram.") # Debug log
-             else:
-                 print("DEBUG: Unsupported media type via Telethon fallback.") # Debug log
-                 await edit.edit("Unsupported media type.")
-
-             # After successful send/upload in fallback, copy to LOG_GROUP
-             if result: # Check if a result was obtained from sending
-                 print(f"DEBUG: Copying result from fallback send to LOG_GROUP: {LOG_GROUP}") # Debug log
-                 await result.copy(LOG_GROUP)
-                 print("DEBUG: Result copied to LOG_GROUP.") # Debug log
-
+            if msg.photo:
+                result = await app.send_photo(target_chat_id, file, caption=final_caption, reply_to_message_id=topic_id)
+            elif msg.video or msg.document:
+                if await is_file_size_exceeding(file, size_limit):
+                    await handle_large_file(file, sender, edit, final_caption)
+                    return
+                await upload_media(sender, target_chat_id, file, final_caption, edit, topic_id)
+            elif msg.audio:
+                result = await app.send_audio(target_chat_id, file, caption=final_caption, reply_to_message_id=topic_id)
+            elif msg.voice:
+                result = await app.send_voice(target_chat_id, file, reply_to_message_id=topic_id)
+            elif msg.sticker:
+                result = await app.send_sticker(target_chat_id, msg.sticker.file_id, reply_to_message_id=topic_id)
+            else:
+                await edit.edit("Unsupported media type.")
 
     except Exception as e:
-        print(f"DEBUG: Caught exception in copy_message_with_chat_id: {e}") # Debug log
         print(f"Error : {e}")
-        # error_message = f"Error occurred while processing message: {str(e)}"
+        pass
+        #error_message = f"Error occurred while processing message: {str(e)}"
         # await app.send_message(sender, error_message)
         # await app.send_message(sender, f"Make Bot admin in your Channel - {target_chat_id} and restart the process after /cancel")
-        # Consider sending a more specific error message to the user and logging to LOG_GROUP here as well
-        try:
-            await app.send_message(LOG_GROUP, f"**Processing Failed:** {str(e)}\nLink: `{msg_link}`")
-            print("DEBUG: Error message sent to LOG_GROUP from copy_message_with_chat_id exception.") # Debug log
-        except Exception as log_e:
-            print(f"DEBUG: Failed to send error message to LOG_GROUP from copy_message_with_chat_id exception: {log_e}") # Debug log
-
 
     finally:
-        print(f"DEBUG: copy_message_with_chat_id finally block for link: {msg_link}") # Debug log
-        # Clean up
         if file and os.path.exists(file):
-            print(f"DEBUG: Removing downloaded file in copy_message_with_chat_id finally: {file}") # Debug log
             os.remove(file)
-        if edit:
-             # Ensure edit message is deleted
-             try:
-                 await edit.delete(2)
-                 print("DEBUG: Edit message deleted in copy_message_with_chat_id finally.") # Debug log
-             except Exception as delete_e:
-                 print(f"DEBUG: Failed to delete edit message in copy_message_with_chat_id finally: {delete_e}") # Debug log
-        gc.collect()
-        print("DEBUG: copy_message_with_chat_id finally block finished.") # Debug log
 
 
 async def send_media_message(app, target_chat_id, msg, caption, topic_id):
-    print(f"DEBUG: Starting send_media_message to {target_chat_id}") # Debug log
     try:
         if msg.video:
-            print("DEBUG: Sending video by file_id.") # Debug log
             return await app.send_video(target_chat_id, msg.video.file_id, caption=caption, reply_to_message_id=topic_id)
         if msg.document:
-            print("DEBUG: Sending document by file_id.") # Debug log
             return await app.send_document(target_chat_id, msg.document.file_id, caption=caption, reply_to_message_id=topic_id)
         if msg.photo:
-            print("DEBUG: Sending photo by file_id.") # Debug log
             return await app.send_photo(target_chat_id, msg.photo.file_id, caption=caption, reply_to_message_id=topic_id)
     except Exception as e:
-        print(f"DEBUG: Error while sending media by file_id in send_media_message: {e}") # Debug log
         print(f"Error while sending media: {e}")
-
+    
     # Fallback to copy_message in case of any exceptions
-    print(f"DEBUG: Falling back to copy_message to {target_chat_id}") # Debug log
     return await app.copy_message(target_chat_id, msg.chat.id, msg.id, reply_to_message_id=topic_id)
-
+    
 
 def format_caption(original_caption, sender, custom_caption):
-    # ... (your existing format_caption function) ...
     delete_words = load_delete_words(sender)
     replacements = load_replacement_words(sender)
 
     # Remove and replace words in the caption
     for word in delete_words:
-        original_caption = original_caption.replace(word, '  ') # Use two spaces for clarity
+        original_caption = original_caption.replace(word, '  ')
     for word, replace_word in replacements.items():
         original_caption = original_caption.replace(word, replace_word)
 
     # Append custom caption if available
     return f"{original_caption}\n\n__**{custom_caption}**__" if custom_caption else original_caption
 
-
+    
 # ------------------------ Button Mode Editz FOR SETTINGS ----------------------------
 
 # Define a dictionary to store user chat IDs
 user_chat_ids = {}
 
 def load_user_data(user_id, key, default_value=None):
-    # ... (your existing load_user_data function) ...
     try:
         user_data = collection.find_one({"_id": user_id})
         return user_data.get(key, default_value) if user_data else default_value
@@ -715,7 +506,6 @@ def load_user_data(user_id, key, default_value=None):
         return default_value
 
 def load_saved_channel_ids():
-    # ... (your existing load_saved_channel_ids function) ...
     saved_channel_ids = set()
     try:
         # Retrieve channel IDs from MongoDB collection
@@ -726,7 +516,6 @@ def load_saved_channel_ids():
     return saved_channel_ids
 
 def save_user_data(user_id, key, value):
-    # ... (your existing save_user_data function) ...
     try:
         collection.update_one(
             {"_id": user_id},
@@ -780,7 +569,7 @@ async def settings_command(event):
     await send_settings_message(event.chat_id, user_id)
 
 async def send_settings_message(chat_id, user_id):
-    # ... (your existing send_settings_message function) ...
+    
     # Define the rest of the buttons
     buttons = [
         [Button.inline("Set Chat ID", b'setchat'), Button.inline("Set Rename Tag", b'setrename')],
@@ -805,9 +594,8 @@ pending_photos = {}
 
 @gf.on(events.CallbackQuery)
 async def callback_query_handler(event):
-    # ... (your existing callback_query_handler function) ...
     user_id = event.sender_id
-
+    
     if event.data == b'setchat':
         await event.respond("Send me the ID of that chat:")
         sessions[user_id] = 'setchat'
@@ -815,7 +603,7 @@ async def callback_query_handler(event):
     elif event.data == b'setrename':
         await event.respond("Send me the rename tag:")
         sessions[user_id] = 'setrename'
-
+    
     elif event.data == b'setcaption':
         await event.respond("Send me the caption:")
         sessions[user_id] = 'setcaption'
@@ -831,7 +619,7 @@ async def callback_query_handler(event):
     elif event.data == b'delete':
         await event.respond("Send words seperated by space to delete them from caption/filename ...")
         sessions[user_id] = 'deleteword'
-
+        
     elif event.data == b'logout':
         await remove_session(user_id)
         user_data = await get_data(user_id)
@@ -839,11 +627,11 @@ async def callback_query_handler(event):
             await event.respond("Logged out and deleted session successfully.")
         else:
             await event.respond("You are not logged in.")
-
+        
     elif event.data == b'setthumb':
         pending_photos[user_id] = True
         await event.respond('Please send the photo you want to set as the thumbnail.')
-
+    
     elif event.data == b'pdfwt':
         await event.respond("Watermark is Pro+ Plan.. contact @Contact_xbot")
         return
@@ -868,12 +656,12 @@ async def callback_query_handler(event):
 
     elif event.data == b'telethon':
         save_user_upload_method(user_id, "Telethon")
-        await event.edit("Upload method set to **SpyLib ⚡\n\nThanks for choosing this library as it will help me to analyze the error raise issues on github.** ✅")
-
+        await event.edit("Upload method set to **SpyLib ⚡\n\nThanks for choosing this library as it will help me to analyze the error raise issues on github.** ✅")        
+        
     elif event.data == b'reset':
         try:
             user_id_str = str(user_id)
-
+            
             collection.update_one(
                 {"_id": user_id},
                 {"$unset": {
@@ -883,7 +671,7 @@ async def callback_query_handler(event):
                     "duration_limit": ""
                 }}
             )
-
+            
             collection.update_one(
                 {"user_id": user_id},
                 {"$unset": {
@@ -892,7 +680,7 @@ async def callback_query_handler(event):
                     "watermark_text": "",
                     "duration_limit": ""
                 }}
-            )
+            )            
             user_chat_ids.pop(user_id, None)
             user_rename_preferences.pop(user_id_str, None)
             user_caption_preferences.pop(user_id_str, None)
@@ -902,18 +690,17 @@ async def callback_query_handler(event):
             await event.respond("✅ Reset successfully, to logout click /logout")
         except Exception as e:
             await event.respond(f"Error clearing delete list: {e}")
-
+    
     elif event.data == b'remthumb':
         try:
             os.remove(f'{user_id}.jpg')
             await event.respond('Thumbnail removed successfully!')
         except FileNotFoundError:
             await event.respond("No thumbnail found to remove.")
-
+    
 
 @gf.on(events.NewMessage(func=lambda e: e.sender_id in pending_photos))
 async def save_thumbnail(event):
-    # ... (your existing save_thumbnail function) ...
     user_id = event.sender_id  # Use event.sender_id as user_id
 
     if event.photo:
@@ -930,7 +717,6 @@ async def save_thumbnail(event):
     pending_photos.pop(user_id, None)
 
 def save_user_upload_method(user_id, method):
-    # ... (your existing save_user_upload_method function) ...
     # Save or update the user's preferred upload method
     collection.update_one(
         {'user_id': user_id},  # Query
@@ -940,7 +726,6 @@ def save_user_upload_method(user_id, method):
 
 @gf.on(events.NewMessage)
 async def handle_user_input(event):
-    # ... (your existing handle_user_input function) ...
     user_id = event.sender_id
     if user_id in sessions:
         session_type = sessions[user_id]
@@ -952,12 +737,12 @@ async def handle_user_input(event):
                 await event.respond("Chat ID set successfully!")
             except ValueError:
                 await event.respond("Invalid chat ID!")
-
+                
         elif session_type == 'setrename':
             custom_rename_tag = event.text
             await set_rename_command(user_id, custom_rename_tag)
             await event.respond(f"Custom rename tag set to: {custom_rename_tag}")
-
+        
         elif session_type == 'setcaption':
             custom_caption = event.text
             await set_caption_command(user_id, custom_caption)
@@ -982,22 +767,297 @@ async def handle_user_input(event):
             session_string = event.text
             await set_session(user_id, session_string)
             await event.respond("✅ Session string added successfully!")
-
+                
         elif session_type == 'deleteword':
             words_to_delete = event.message.text.split()
             delete_words = load_delete_words(user_id)
             delete_words.update(words_to_delete)
             save_delete_words(user_id, delete_words)
             await event.respond(f"Words added to delete list: {', '.join(words_to_delete)}")
-
-
+               
+            
         del sessions[user_id]
-
+    
 # Command to store channel IDs
 @gf.on(events.NewMessage(incoming=True, pattern='/lock'))
 async def lock_command_handler(event):
-    # ... (your existing lock_command_handler function) ...
     if event.sender_id not in OWNER_ID:
         return await event.respond("You are not authorized to use this command.")
+    
+    # Extract the channel ID from the command
+    try:
+        channel_id = int(event.text.split(' ')[1])
+    except (ValueError, IndexError):
+        return await event.respond("Invalid /lock command. Use /lock CHANNEL_ID.")
+    
+    # Save the channel ID to the MongoDB database
+    try:
+        # Insert the channel ID into the collection
+        collection.insert_one({"channel_id": channel_id})
+        await event.respond(f"Channel ID {channel_id} locked successfully.")
+    except Exception as e:
+        await event.respond(f"Error occurred while locking channel ID: {str(e)}")
 
-    # Extract the channel ID
+
+async def handle_large_file(file, sender, edit, caption):
+    if pro is None:
+        await edit.edit('**__ ❌ 4GB trigger not found__**')
+        os.remove(file)
+        gc.collect()
+        return
+    
+    dm = None
+    
+    print("4GB connector found.")
+    await edit.edit('**__ ✅ 4GB trigger connected...__**\n\n')
+    
+    target_chat_id = user_chat_ids.get(sender, sender)
+    file_extension = str(file).split('.')[-1].lower()
+    metadata = video_metadata(file)
+    duration = metadata['duration']
+    width = metadata['width']
+    height = metadata['height']
+    
+    thumb_path = await screenshot(file, duration, sender)
+    try:
+        if file_extension in VIDEO_EXTENSIONS:
+            dm = await pro.send_video(
+                LOG_GROUP,
+                video=file,
+                caption=caption,
+                thumb=thumb_path,
+                height=height,
+                width=width,
+                duration=duration,
+                progress=progress_bar,
+                progress_args=(
+                    "╭─────────────────────╮\n│       **__4GB Uploader__ ⚡**\n├─────────────────────",
+                    edit,
+                    time.time()
+                )
+            )
+        else:
+            # Send as document
+            dm = await pro.send_document(
+                LOG_GROUP,
+                document=file,
+                caption=caption,
+                thumb=thumb_path,
+                progress=progress_bar,
+                progress_args=(
+                    "╭─────────────────────╮\n│      **__4GB Uploader ⚡__**\n├─────────────────────",
+                    edit,
+                    time.time()
+                )
+            )
+
+        from_chat = dm.chat.id
+        msg_id = dm.id
+        freecheck = 0
+        if freecheck == 1:
+            reply_markup = InlineKeyboardMarkup(
+                [
+                    [InlineKeyboardButton("💎 Get Premium to Forward", url="https://t.me/Contact_xbot")]
+                ]
+            )
+            await app.copy_message(
+                target_chat_id,
+                from_chat,
+                msg_id,
+                protect_content=True,
+                reply_markup=reply_markup
+            )
+        else:
+            # Simple copy without protect_content or reply_markup
+            await app.copy_message(
+                target_chat_id,
+                from_chat,
+                msg_id
+            )
+            
+    except Exception as e:
+        print(f"Error while sending file: {e}")
+
+    finally:
+        await edit.delete()
+        os.remove(file)
+        gc.collect()
+        return
+
+async def rename_file(file, sender):
+    delete_words = load_delete_words(sender)
+    custom_rename_tag = get_user_rename_preference(sender)
+    replacements = load_replacement_words(sender)
+    
+    last_dot_index = str(file).rfind('.')
+    
+    if last_dot_index != -1 and last_dot_index != 0:
+        ggn_ext = str(file)[last_dot_index + 1:]
+        
+        if ggn_ext.isalpha() and len(ggn_ext) <= 9:
+            if ggn_ext.lower() in VIDEO_EXTENSIONS:
+                original_file_name = str(file)[:last_dot_index]
+                file_extension = 'mp4'
+            else:
+                original_file_name = str(file)[:last_dot_index]
+                file_extension = ggn_ext
+        else:
+            original_file_name = str(file)[:last_dot_index]
+            file_extension = 'mp4'
+    else:
+        original_file_name = str(file)
+        file_extension = 'mp4'
+        
+    for word in delete_words:
+        original_file_name = original_file_name.replace(word, "")
+
+    for word, replace_word in replacements.items():
+        original_file_name = original_file_name.replace(word, replace_word)
+
+    new_file_name = f"{original_file_name} {custom_rename_tag}.{file_extension}"
+    await asyncio.to_thread(os.rename, file, new_file_name)
+    return new_file_name
+
+
+async def sanitize(file_name: str) -> str:
+    sanitized_name = re.sub(r'[\\/:"*?<>|]', '_', file_name)
+    # Strip leading/trailing whitespaces
+    return sanitized_name.strip()
+    
+async def is_file_size_exceeding(file_path, size_limit):
+    try:
+        return os.path.getsize(file_path) > size_limit
+    except FileNotFoundError:
+        print(f"File not found: {file_path}")
+        return False
+    except Exception as e:
+        print(f"Error while checking file size: {e}")
+        return False
+
+
+user_progress = {}
+
+def progress_callback(done, total, user_id):
+    # Check if this user already has progress tracking
+    if user_id not in user_progress:
+        user_progress[user_id] = {
+            'previous_done': 0,
+            'previous_time': time.time()
+        }
+    
+    # Retrieve the user's tracking data
+    user_data = user_progress[user_id]
+    
+    # Calculate the percentage of progress
+    percent = (done / total) * 100
+    
+    # Format the progress bar
+    completed_blocks = int(percent // 10)
+    remaining_blocks = 10 - completed_blocks
+    progress_bar = "♦" * completed_blocks + "◇" * remaining_blocks
+    
+    # Convert done and total to MB for easier reading
+    done_mb = done / (1024 * 1024)  # Convert bytes to MB
+    total_mb = total / (1024 * 1024)
+    
+    # Calculate the upload speed (in bytes per second)
+    speed = done - user_data['previous_done']
+    elapsed_time = time.time() - user_data['previous_time']
+    
+    if elapsed_time > 0:
+        speed_bps = speed / elapsed_time  # Speed in bytes per second
+        speed_mbps = (speed_bps * 8) / (1024 * 1024)  # Speed in Mbps
+    else:
+        speed_mbps = 0
+    
+    # Estimated time remaining (in seconds)
+    if speed_bps > 0:
+        remaining_time = (total - done) / speed_bps
+    else:
+        remaining_time = 0
+    
+    # Convert remaining time to minutes
+    remaining_time_min = remaining_time / 60
+    
+    # Format the final output as needed
+    final = (
+        f"╭──────────────────╮\n"
+        f"│     **__SpyLib ⚡ Uploader__**       \n"
+        f"├──────────\n"
+        f"│ {progress_bar}\n\n"
+        f"│ **__Progress:__** {percent:.2f}%\n"
+        f"│ **__Done:__** {done_mb:.2f} MB / {total_mb:.2f} MB\n"
+        f"│ **__Speed:__** {speed_mbps:.2f} Mbps\n"
+        f"│ **__ETA:__** {remaining_time_min:.2f} min\n"
+        f"╰──────────────────╯\n\n"
+        f"**__Please wait__**"
+    )
+    
+    # Update tracking variables for the user
+    user_data['previous_done'] = done
+    user_data['previous_time'] = time.time()
+    
+    return final
+
+
+def dl_progress_callback(done, total, user_id):
+    # Check if this user already has progress tracking
+    if user_id not in user_progress:
+        user_progress[user_id] = {
+            'previous_done': 0,
+            'previous_time': time.time()
+        }
+    
+    # Retrieve the user's tracking data
+    user_data = user_progress[user_id]
+    
+    # Calculate the percentage of progress
+    percent = (done / total) * 100
+    
+    # Format the progress bar
+    completed_blocks = int(percent // 10)
+    remaining_blocks = 10 - completed_blocks
+    progress_bar = "♦" * completed_blocks + "◇" * remaining_blocks
+    
+    # Convert done and total to MB for easier reading
+    done_mb = done / (1024 * 1024)  # Convert bytes to MB
+    total_mb = total / (1024 * 1024)
+    
+    # Calculate the upload speed (in bytes per second)
+    speed = done - user_data['previous_done']
+    elapsed_time = time.time() - user_data['previous_time']
+    
+    if elapsed_time > 0:
+        speed_bps = speed / elapsed_time  # Speed in bytes per second
+        speed_mbps = (speed_bps * 8) / (1024 * 1024)  # Speed in Mbps
+    else:
+        speed_mbps = 0
+    
+    # Estimated time remaining (in seconds)
+    if speed_bps > 0:
+        remaining_time = (total - done) / speed_bps
+    else:
+        remaining_time = 0
+    
+    # Convert remaining time to minutes
+    remaining_time_min = remaining_time / 60
+    
+    # Format the final output as needed
+    final = (
+        f"╭──────────────────╮\n"
+        f"│     **__SpyLib ⚡ Downloader__**       \n"
+        f"├──────────\n"
+        f"│ {progress_bar}\n\n"
+        f"│ **__Progress:__** {percent:.2f}%\n"
+        f"│ **__Done:__** {done_mb:.2f} MB / {total_mb:.2f} MB\n"
+        f"│ **__Speed:__** {speed_mbps:.2f} Mbps\n"
+        f"│ **__ETA:__** {remaining_time_min:.2f} min\n"
+        f"╰──────────────────╯\n\n"
+        f"**__Please wait__**"
+    )
+    
+    # Update tracking variables for the user
+    user_data['previous_done'] = done
+    user_data['previous_time'] = time.time()
+    
+    return final
