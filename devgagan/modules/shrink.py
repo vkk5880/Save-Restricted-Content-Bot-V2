@@ -30,6 +30,9 @@ from config import MONGO_DB, WEBSITE_URL, AD_API, LOG_GROUP
 from pyrogram.types import Message # Import Message type
 from config import LOG_GROUP # Make sure LOG_GROUP is imported from your config
 
+
+import logging
+import sys # Import sys for standard output
  
 tclient = AsyncIOMotorClient(MONGO_DB)
 tdb = tclient["telegram_bot"]
@@ -66,9 +69,41 @@ async def is_user_verified(user_id):
     """Check if a user has an active session."""
     session = await token.find_one({"user_id": user_id})
     return session is not None
- 
+
+
+
 
  
+
+# --- Simple Logging Setup ---
+# This sets up a basic logger that prints to standard output.
+# If you have a more comprehensive logging setup elsewhere, you might remove this block.
+
+# Get a logger instance (using __name__ is common)
+logger = logging.getLogger(__name__)
+
+# Set the minimum logging level to capture
+# logging.DEBUG is useful for development, logging.INFO or higher for production
+logger.setLevel(logging.DEBUG)
+
+# Create a handler to send log messages to standard output
+handler = logging.StreamHandler(sys.stdout)
+
+# Define the format for log messages
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+# Add the formatter to the handler
+handler.setFormatter(formatter)
+
+# Add the handler to the logger
+# The check 'if not logger.handlers:' prevents adding the handler multiple times
+# if this code block were somehow executed more than once.
+if not logger.handlers:
+    logger.addHandler(handler)
+
+# --- End Simple Logging Setup ---
+
+
 # This function should be placed in one of the files inside your
 # devgagan/modules directory that is imported by __main__.py
 
@@ -77,31 +112,56 @@ async def test_log_copy_command(client: Client, message: Message):
     """
     Handles the /testlogcopy command to send a test message to the LOG_GROUP
     by copying a temporary message. The temporary message is NOT deleted.
-    Uses LOG_GROUP directly in the copy method.
+    Uses LOG_GROUP directly in the copy method and uses the simple logging setup.
+    Includes LOG_GROUP value in the reply message.
     """
+    # LOG_GROUP is used directly from config
+
     temp_message = None # Initialize temp_message to None
+    logger.info(f"Received /testlogcopy command from user {message.from_user.id}") # Log command reception
 
     try:
         # 1. Send a temporary message to get a Message object
         # We send it to the user who sent the command
         temp_message = await message.reply("Creating a message to copy...")
-        print(f"DEBUG: Sent temporary message (ID: {temp_message.id}) to user {message.chat.id}") # Debug log
+        logger.debug(f"Sent temporary message (ID: {temp_message.id}) to user {message.chat.id}") # Log temporary message sent
 
         # 2. Copy the temporary message to the LOG_GROUP
         # Using LOG_GROUP directly
-        print(f"DEBUG: Attempting to copy temporary message (ID: {temp_message.id}) to LOG_GROUP {LOG_GROUP}") # Debug log
-        copied_message = await temp_message.copy(LOG_GROUP)
-        print(f"DEBUG: Temporary message successfully copied to LOG_GROUP {LOG_GROUP}. Copied message ID: {copied_message.id}") # Debug log
+        logger.debug(f"Attempting to copy temporary message (ID: {temp_message.id}) to LOG_GROUP {LOG_GROUP}") # Log copy attempt
+        copied_message = await temp_message.copy(chat_id=LOG_GROUP)
+        logger.info(f"Temporary message successfully copied to LOG_GROUP {LOG_GROUP}. Copied message ID: {copied_message.id}") # Log successful copy
 
-        # 3. Reply to the user indicating success
-        await message.reply("Test message successfully copied to the LOG_GROUP using copy(). Temporary message was not deleted.")
+        # 3. Reply to the user indicating success, including LOG_GROUP value
+        await message.reply(f"Test message successfully copied to the LOG_GROUP (`{LOG_GROUP}`) using copy(). Temporary message was not deleted.")
+        logger.info(f"Replied to user indicating successful copy to LOG_GROUP {LOG_GROUP}.") # Log user notification
 
     except Exception as e:
-        # Reply to the user indicating failure and the error
-        await message.reply(f"Failed to copy test message to the LOG_GROUP: {e}")
-        print(f"DEBUG: Failed to copy temporary message to LOG_GROUP {LOG_GROUP} via /testlogcopy. Error: {e}") # Debug log
+        # Reply to the user indicating failure and the error, including LOG_GROUP value
+        await message.reply(f"Failed to copy test message to the LOG_GROUP (`{LOG_GROUP}`): {e}")
+        logger.error(f"Failed to copy temporary message to LOG_GROUP {LOG_GROUP} via /testlogcopy. Error: {e}", exc_info=True) # Log failure with traceback
 
     # The finally block for deleting the temporary message has been removed.
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -124,9 +184,9 @@ async def test_msg_command(client, message):
         # Use the 'client' instance passed to the handler
         await app.send_message(LOG_GROUP, text="This is a test message from the bot!")
         # Use the correct variable name in the print statement
-        print(f"Message successfully sent to group {LOG_GROUP}")
+        print("Message successfully sent to group {LOG_GROUP}")
     except Exception as e:
-        print(f"Error sending message: {e}")
+        print("Error sending message: {e}")
 
     # Optional: Reply to the user who sent the command for confirmation
     await message.reply("Test message execution attempted.")
