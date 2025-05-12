@@ -67,35 +67,26 @@ async def is_user_verified(user_id):
 
 
 
-
-
+# The first test_send_command function (kept as requested, assuming it has a purpose)
 @app.on_message(filters.command("test_send"))
-
-async def test_send_command(client, message):
-    private_group_id = -1002633547185 # Replace with your group ID
-
- try:
-            await app.send_message(chat_id=private_group_id, text="This is a test message from the bot!")
-            print(f"Message successfully sent to group {target_group_id}")
-        except Exception as e:
-            print(f"Error sending message: {e}")
-    
-    await message.reply("Test message sent!") # Optional confirmation
-
-
-
-
-
-
- 
-
-# This function should be placed in one of the files inside your
-# devgagan/modules directory that is imported by __main__.py
-
-@Client.on_message(filters.command("testmsg"))
 async def test_send_command(client, message):
     """
-    Handles the /test_send command to send a message to a private group.
+    Handles the /test_send command.
+    (Assuming this function has specific logic you want to keep)
+    """
+    # Add the logic for your original test_send command here.
+    # For example, you might want to print a simple message:
+    print(f"Received /test_send command from user {message.from_user.id}")
+    await message.reply("Acknowledged /test_send command.")
+    # If this function was intended for something else, replace the above with its actual logic.
+
+
+# This is the function previously duplicated, now renamed to test_msg_command
+# and intended to send a message to a private group.
+@app.on_message(filters.command("testmsg")) # Using the command name "testmsg"
+async def test_msg_command(client, message):
+    """
+    Handles the /testmsg command to send a message to a private group.
     """
     # Replace with your target private group's chat ID (integer format)
     # Make sure the bot account is a member of this group
@@ -111,13 +102,6 @@ async def test_send_command(client, message):
 
     # Optional: Reply to the user who sent the command for confirmation
     await message.reply("Test message execution attempted.")
-
-
-
-
-
-
-
 
 
 
