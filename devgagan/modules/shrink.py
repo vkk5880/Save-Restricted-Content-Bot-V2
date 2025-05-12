@@ -189,7 +189,7 @@ async def test_msg_command(client, message):
         print("Error sending message: {e}")
 
     # Optional: Reply to the user who sent the command for confirmation
-    await message.reply("Test message successfully attempted to the LOG_GROUP (`{LOG_GROUP}`) using copy().")
+    await message.reply(f"Test message successfully attempted to the LOG_GROUP (`{LOG_GROUP}`) .")
 
 
 
