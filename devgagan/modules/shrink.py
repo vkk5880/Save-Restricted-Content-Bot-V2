@@ -27,6 +27,9 @@ from config import MONGO_DB, WEBSITE_URL, AD_API, LOG_GROUP
 #import devgagan.modules.connectUser  # Correct import path
 #from devgagan.modules.connectUser import register_handlers
  
+from pyrogram.types import Message # Import Message type
+from config import LOG_GROUP # Make sure LOG_GROUP is imported from your config
+
  
 tclient = AsyncIOMotorClient(MONGO_DB)
 tdb = tclient["telegram_bot"]
@@ -65,22 +68,47 @@ async def is_user_verified(user_id):
     return session is not None
  
 
+ 
+# This function should be placed in one of the files inside your
+# devgagan/modules directory that is imported by __main__.py
 
-
-# The first test_send_command function (kept as requested, assuming it has a purpose)
-@app.on_message(filters.command("test_send"))
-async def test_send_command(client, message):
+@app.on_message(filters.command("testlogcopy"))
+async def test_log_copy_command(client: Client, message: Message):
     """
-    Handles the /test_send command.
-    (Assuming this function has specific logic you want to keep)
+    Handles the /testlogcopy command to send a test message to the LOG_GROUP
+    by copying a temporary message. The temporary message is NOT deleted.
+    Uses LOG_GROUP directly in the copy method.
     """
-    # Add the logic for your original test_send command here.
-    # For example, you might want to print a simple message:
-    print(f"Received /test_send command from user {message.from_user.id}")
-    await message.reply("Acknowledged /test_send command.")
-    # If this function was intended for something else, replace the above with its actual logic.
+    temp_message = None # Initialize temp_message to None
+
+    try:
+        # 1. Send a temporary message to get a Message object
+        # We send it to the user who sent the command
+        temp_message = await message.reply("Creating a message to copy...")
+        print(f"DEBUG: Sent temporary message (ID: {temp_message.id}) to user {message.chat.id}") # Debug log
+
+        # 2. Copy the temporary message to the LOG_GROUP
+        # Using LOG_GROUP directly
+        print(f"DEBUG: Attempting to copy temporary message (ID: {temp_message.id}) to LOG_GROUP {LOG_GROUP}") # Debug log
+        copied_message = await temp_message.copy(LOG_GROUP)
+        print(f"DEBUG: Temporary message successfully copied to LOG_GROUP {LOG_GROUP}. Copied message ID: {copied_message.id}") # Debug log
+
+        # 3. Reply to the user indicating success
+        await message.reply("Test message successfully copied to the LOG_GROUP using copy(). Temporary message was not deleted.")
+
+    except Exception as e:
+        # Reply to the user indicating failure and the error
+        await message.reply(f"Failed to copy test message to the LOG_GROUP: {e}")
+        print(f"DEBUG: Failed to copy temporary message to LOG_GROUP {LOG_GROUP} via /testlogcopy. Error: {e}") # Debug log
+
+    # The finally block for deleting the temporary message has been removed.
 
 
+
+
+
+
+ 
 # This is the function previously duplicated, now renamed to test_msg_command
 # and intended to send a message to a private group.
 @app.on_message(filters.command("testmsg")) # Using the command name "testmsg"
@@ -96,7 +124,7 @@ async def test_msg_command(client, message):
         # Use the 'client' instance passed to the handler
         await app.send_message(LOG_GROUP, text="This is a test message from the bot!")
         # Use the correct variable name in the print statement
-        print(f"Message successfully sent to group {private_group_id}")
+        print(f"Message successfully sent to group {LOG_GROUP}")
     except Exception as e:
         print(f"Error sending message: {e}")
 
