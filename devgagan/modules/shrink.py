@@ -64,7 +64,66 @@ async def is_user_verified(user_id):
     session = await token.find_one({"user_id": user_id})
     return session is not None
  
+
+
+
+
+
+@app.on_message(filters.command("test_send"))
+
+async def test_send_command(client, message):
+    private_group_id = -1002633547185 # Replace with your group ID
+
+ try:
+            await app.send_message(chat_id=private_group_id, text="This is a test message from the bot!")
+            print(f"Message successfully sent to group {target_group_id}")
+        except Exception as e:
+            print(f"Error sending message: {e}")
+    
+    await message.reply("Test message sent!") # Optional confirmation
+
+
+
+
+
+
  
+
+# This function should be placed in one of the files inside your
+# devgagan/modules directory that is imported by __main__.py
+
+@Client.on_message(filters.command("testmsg"))
+async def test_send_command(client, message):
+    """
+    Handles the /test_send command to send a message to a private group.
+    """
+    # Replace with your target private group's chat ID (integer format)
+    # Make sure the bot account is a member of this group
+    private_group_id = -1002633547185 # Replace with your group ID
+
+    try:
+        # Use the 'client' instance passed to the handler
+        await client.send_message(chat_id=private_group_id, text="This is a test message from the bot!")
+        # Use the correct variable name in the print statement
+        print(f"Message successfully sent to group {private_group_id}")
+    except Exception as e:
+        print(f"Error sending message: {e}")
+
+    # Optional: Reply to the user who sent the command for confirmation
+    await message.reply("Test message execution attempted.")
+
+
+
+
+
+
+
+
+
+
+
+
+
 @app.on_message(filters.command("start"))
 async def token_handler(client, message):
     """Handle the /token command."""
