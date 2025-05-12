@@ -94,7 +94,7 @@ async def test_msg_command(client, message):
 
     try:
         # Use the 'client' instance passed to the handler
-        await app.send_message(chat_id=private_group_id, text="This is a test message from the bot!")
+        await app.send_message(LOG_GROUP, text="This is a test message from the bot!")
         # Use the correct variable name in the print statement
         print(f"Message successfully sent to group {private_group_id}")
     except Exception as e:
