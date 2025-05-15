@@ -1,5 +1,5 @@
 # ---------------------------------------------------
-# File Name: __main__.py
+# File Name: __init__.py
 # Description: A Pyrogram bot for downloading files from Telegram channels or groups 
 #              and uploading them back to Telegram.
 # Author: Gagan
@@ -13,55 +13,65 @@
 # ---------------------------------------------------
 
 import asyncio
-import importlib
-import gc
-#import uvloop
-from pyrogram import idle
-from devgagan.modules import ALL_MODULES
-from devgagan.core.mongo.plans_db import check_and_remove_expired_users
-from aiojobs import create_scheduler
-
-# ----------------------------Bot-Start---------------------------- #
-
-# --- Add uvloop installation here ---
-#uvloop.install()
-# ----------------------------------
-
+import logging
+from pyrogram import Client
+from pyrogram.enums import ParseMode 
+from config import API_ID, API_HASH, BOT_TOKEN, STRING, MONGO_DB
+from telethon.sync import TelegramClient
+from motor.motor_asyncio import AsyncIOMotorClient
+import time
 
 loop = asyncio.get_event_loop()
 
-# Function to schedule expiry checks
-async def schedule_expiry_check():
-    scheduler = await create_scheduler()
-    while True:
-        await scheduler.spawn(check_and_remove_expired_users())
-        await asyncio.sleep(300)  # Check every hour
-        gc.collect()
+logging.basicConfig(
+    format="[%(levelname) 5s/%(asctime)s] %(name)s: %(message)s",
+    level=logging.INFO,
+)
 
-async def devggn_boot():
-    for all_module in ALL_MODULES:
-        importlib.import_module("devgagan.modules." + all_module)
-    print("""
----------------------------------------------------
-📂 Bot Deployed successfully ...
-📝 Description: A Pyrogram bot for downloading files from Telegram channels or groups 
-                and uploading them back to Telegram.
-👨‍💻 Author: Adarsh
-📬 Telegram: https://t.me/Contact_xbot
-🗓️ Created: 2025-01-11
-🔄 Last Modified: 2025-01-11
-🛠️ Version: 2.0.5
-📜 License: MIT License
----------------------------------------------------
-""")
+botStartTime = time.time()
 
-    asyncio.create_task(schedule_expiry_check())
-    print("Auto removal started ...")
-    await idle()
-    print("Bot stopped...")
+app = Client(
+    ":RestrictBot:",
+    api_id=API_ID,
+    api_hash=API_HASH,
+    bot_token=BOT_TOKEN,
+    workers=50,
+    parse_mode=ParseMode.MARKDOWN
+)
+
+pro = Client("ggbot", api_id=API_ID, api_hash=API_HASH, session_string=STRING)
+
+telethon_user_client = TelegramClient('sexrepo', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 
 
-if __name__ == "__main__":
-    loop.run_until_complete(devggn_boot())
+# MongoDB setup
+tclient = AsyncIOMotorClient(MONGO_DB)
+tdb = tclient["telegram_bot"]  # Your database
+token = tdb["tokens"]  # Your tokens collection
 
-# ------------------------------------------------------------------ #
+async def create_ttl_index():
+    """Ensure the TTL index exists for the `tokens` collection."""
+    await token.create_index("expires_at", expireAfterSeconds=0)
+
+# Run the TTL index creation when the bot starts
+async def setup_database():
+    await create_ttl_index()
+    print("MongoDB TTL index created.")
+
+# You can call this in your main bot file before starting the bot
+
+async def restrict_bot():
+    global BOT_ID, BOT_NAME, BOT_USERNAME
+    await setup_database()
+    await app.start()
+    getme = await app.get_me()
+    BOT_ID = getme.id
+    BOT_USERNAME = getme.username
+    if getme.last_name:
+        BOT_NAME = getme.first_name + " " + getme.last_name
+    else:
+        BOT_NAME = getme.first_name
+    if STRING:
+        await pro.start()
+
+loop.run_until_complete(restrict_bot())
