@@ -18,6 +18,7 @@ from telethon import events
 from telethon.tl.custom import Button
 from devgagan import sex as gagan
 from devgagan import botStartTime  
+from config import CONTACT  
 
 SIZE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']
 
@@ -63,7 +64,7 @@ def speed_convert(size, byte=True):
     return f"{round(size, 2)} {units[zero]}"
 
 # ✅ Define Buttons Globally (Keeping "Report Issue")
-buttons = [[Button.url("🐛 Report Bug", "https://t.me/Contact_xbot")]]
+buttons = [[Button.url("🐛 Report Bug", CONTACT)]]
 
 @gagan.on(events.NewMessage(incoming=True, pattern='/speedtest'))
 async def speedtest(event):
