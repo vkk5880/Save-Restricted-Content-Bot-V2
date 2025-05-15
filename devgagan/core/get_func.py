@@ -20,7 +20,7 @@ import os
 import re
 from typing import Callable
 from devgagan import app
-from devgagan import sex as gf
+from devgagan import telethon_user_client as gf
 from telethon.tl.types import DocumentAttributeVideo, Message
 from telethon.sessions import StringSession
 import pymongo
