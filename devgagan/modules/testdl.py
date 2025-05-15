@@ -136,7 +136,7 @@ async def test_download_handler(client: Client, message: Message): # 'client' he
 
     # Ensure telethon_user_client is initialized and started
     global telethon_user_client
-    if telethon_user_client is None or not await telethon_user_client.is_connected():
+    if telethon_user_client is None or not telethon_user_client.is_connected():
          # Handle the case where telethon_user_client wasn't initialized or connected
          await client.send_message(user_chat_id, "⚠️ Telethon client is not running or connected. Cannot perform this download.")
          print("Error: telethon_user_client is not running/connected in test_download_handler.")
