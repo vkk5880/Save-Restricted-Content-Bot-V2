@@ -119,12 +119,13 @@ async def progress_callback(current, total, client, progress_message_id, chat_id
 # --- Telethon Command Handler for /testdonl ---
 
 @app.on_message(filters.command("testdonl"))
-async def test_download_handler(event):
-    user_chat_id = event.chat_id
+async def test_download_handler(client, message):
+    user_chat_id = message.chat.id
+    #user_chat_id = event.chat_id
 
     # Send an initial message to indicate download started
     # This message will be edited to show progress
-    status_message = await event.reply("🔍 Fetching file details...")
+    status_message = await message.reply("🔍 Fetching file details...")
     progress_message_id = status_message.id
 
     # Initialize progress data for this download in the global dictionary
