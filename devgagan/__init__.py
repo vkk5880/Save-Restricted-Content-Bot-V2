@@ -111,6 +111,7 @@ async def create_ttl_index():
 # Define async function to start all clients
 async def initialize_clients():
     """Async function to start Pyrogram and Telethon clients."""
+    global telethon_user_client # <--- ADD THIS LINE
     print("Starting clients asynchronously...")
 
     # Start Pyrogram bot client
