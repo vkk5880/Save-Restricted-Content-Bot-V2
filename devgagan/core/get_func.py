@@ -30,7 +30,7 @@ from pyrogram.enums import MessageMediaType, ParseMode
 from devgagan.core.func import *
 from pyrogram.errors import RPCError
 from pyrogram.types import Message
-from config import MONGO_DB as MONGODB_CONNECTION_STRING, LOG_GROUP, OWNER_ID, STRING, API_ID, API_HASH
+from config import MONGO_DB as MONGODB_CONNECTION_STRING, LOG_GROUP, OWNER_ID, STRING, API_ID, CONTACT, API_HASH
 from devgagan.core.mongo.db import set_session, remove_session, get_data
 from telethon import TelegramClient, events, Button
 from devgagantools import fast_upload
@@ -579,7 +579,7 @@ async def send_settings_message(chat_id, user_id):
         [Button.inline("Set Thumbnail", b'setthumb'), Button.inline("Remove Thumbnail", b'remthumb')],
         [Button.inline("PDF Wtmrk", b'pdfwt'), Button.inline("Video Wtmrk", b'watermark')],
         [Button.inline("Upload Method", b'uploadmethod')],  # Include the dynamic Fast DL button
-        [Button.url("Report Errors", "https://t.me/Contact_xbot")]
+        [Button.url("Report Errors", "CONTACT")]
     ]
 
     await gf.send_file(
@@ -857,7 +857,7 @@ async def handle_large_file(file, sender, edit, caption):
         if freecheck == 1:
             reply_markup = InlineKeyboardMarkup(
                 [
-                    [InlineKeyboardButton("💎 Get Premium to Forward", url="https://t.me/Contact_xbot")]
+                    [InlineKeyboardButton("💎 Get Premium to Forward", url=CONTACT)]
                 ]
             )
             await app.copy_message(
