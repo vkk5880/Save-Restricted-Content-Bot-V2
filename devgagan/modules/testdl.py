@@ -1,3 +1,18 @@
+
+from pyrogram import Client, filters
+from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+import random
+import requests
+import string
+import aiohttp
+from devgagan import app
+from devgagan.core.func import *
+from datetime import datetime, timedelta
+from motor.motor_asyncio import AsyncIOMotorClient
+from config import MONGO_DB, WEBSITE_URL, AD_API, LOG_GROUP  
+
+
+
 import time
 import math
 import asyncio
@@ -102,7 +117,8 @@ async def progress_callback(current, total, client, progress_message_id, chat_id
 
 
 # --- Telethon Command Handler for /testdonl ---
-@client.on(events.NewMessage(pattern='/testdonl'))
+
+@app.on_message(filters.command("testdonl"))
 async def test_download_handler(event):
     user_chat_id = event.chat_id
 
