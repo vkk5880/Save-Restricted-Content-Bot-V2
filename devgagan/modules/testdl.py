@@ -17,8 +17,7 @@ import time
 import math
 import asyncio
 import os
-from telethon import TelegramClient, events, types
-from telethon.errors import FloodWaitError, TakeoutInitError, RPCError
+from telethon import TelegramClient, events, typesfrom telethon.errors import FloodWaitError, RPCError # Removed TakeoutInitError
 from datetime import datetime, timedelta
 
 # --- Configuration ---
@@ -242,11 +241,11 @@ async def test_download_handler(event):
         error_msg = f"⏳ FloodWait Error: Please try again in {e.seconds} seconds."
         await client.edit_message(user_chat_id, progress_message_id, error_msg)
         print(f"FloodWait caught: {e}")
-    except TakeoutInitError:
+    #except TakeoutInitError:
          # This error can occur if trying to access private chat history without takeout initialized
-         error_msg = "🔒 Access Error: Cannot access this chat history. Ensure the account is a member or configured correctly."
-         await client.edit_message(user_chat_id, progress_message_id, error_msg)
-         print(f"TakeoutInitError caught.")
+         #error_msg = "🔒 Access Error: Cannot access this chat history. Ensure the account is a member or configured correctly."
+         #await client.edit_message(user_chat_id, progress_message_id, error_msg)
+        # print(f"TakeoutInitError caught.")
     except RPCError as e:
         # Catch other Telegram API errors
         error_msg = f"❌ Telegram API Error: {e.code} - {e.text}"
