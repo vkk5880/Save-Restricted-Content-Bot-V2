@@ -17,7 +17,8 @@ import time
 import math
 import asyncio
 import os
-from telethon import TelegramClient, events, typesfrom telethon.errors import FloodWaitError, RPCError # Removed TakeoutInitError
+from telethon import TelegramClient, events, types
+from telethon.errors import FloodWaitError, RPCError # Removed TakeoutInitError
 from datetime import datetime, timedelta
 
 # --- Configuration ---
