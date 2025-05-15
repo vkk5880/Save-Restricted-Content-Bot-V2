@@ -14,7 +14,7 @@
 
 from pyrogram import filters
 from devgagan import app
-from config import OWNER_ID
+from config import OWNER_ID, CONTACT
 from devgagan.core.func import subscribe
 import asyncio
 from devgagan.core.func import *
@@ -171,7 +171,7 @@ async def terms(client, message):
     buttons = InlineKeyboardMarkup(
         [
             [InlineKeyboardButton("📋 See Plans", callback_data="see_plan")],
-            [InlineKeyboardButton("💬 Contact Now", url="https://t.me/Contact_xbot")],
+            [InlineKeyboardButton("💬 Contact Now", url=CONTACT)],
         ]
     )
     await message.reply_text(terms_text, reply_markup=buttons)
@@ -190,7 +190,7 @@ async def plan(client, message):
     buttons = InlineKeyboardMarkup(
         [
             [InlineKeyboardButton("📜 See Terms", callback_data="see_terms")],
-            [InlineKeyboardButton("💬 Contact Now", url="https://t.me/Contact_xbot")],
+            [InlineKeyboardButton("💬 Contact Now", url=CONTACT)],
         ]
     )
     await message.reply_text(plan_text, reply_markup=buttons)
@@ -209,7 +209,7 @@ async def see_plan(client, callback_query):
     buttons = InlineKeyboardMarkup(
         [
             [InlineKeyboardButton("📜 See Terms", callback_data="see_terms")],
-            [InlineKeyboardButton("💬 Contact Now", url="https://t.me/Contact_xbot")],
+            [InlineKeyboardButton("💬 Contact Now", url=CONTACT)],
         ]
     )
     await callback_query.message.edit_text(plan_text, reply_markup=buttons)
@@ -227,7 +227,7 @@ async def see_terms(client, callback_query):
     buttons = InlineKeyboardMarkup(
         [
             [InlineKeyboardButton("📋 See Plans", callback_data="see_plan")],
-            [InlineKeyboardButton("💬 Contact Now", url="https://t.me/Contact_xbot")],
+            [InlineKeyboardButton("💬 Contact Now", url=CONTACT)],
         ]
     )
     await callback_query.message.edit_text(terms_text, reply_markup=buttons)
