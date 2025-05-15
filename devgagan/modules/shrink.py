@@ -282,7 +282,7 @@ async def smart_handler(client, message):
 @app.on_message(filters.command("admin_commands_list"))
 async def show_admin_commands(client, message):
     """Displays the list of available admin commands (Owner only)."""
-    owner_id=1970647198
+    owner_id=5914434064
     if message.from_user.id != owner_id:
         await message.reply("🚫 You are not the owner and cannot access this command!")
         return
