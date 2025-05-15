@@ -41,7 +41,7 @@ from aiojobs import create_scheduler
 # ----------------------------Bot-Start---------------------------- #
 
 # --- Add uvloop installation here, as early as possible ---
-uvloop.install()
+#uvloop.install()
 print("uvloop installed.")
 # -----------------------------------------------------------
 
