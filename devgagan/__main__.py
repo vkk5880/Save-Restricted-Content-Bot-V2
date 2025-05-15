@@ -15,12 +15,18 @@
 import asyncio
 import importlib
 import gc
+import uvloop
 from pyrogram import idle
 from devgagan.modules import ALL_MODULES
 from devgagan.core.mongo.plans_db import check_and_remove_expired_users
 from aiojobs import create_scheduler
 
 # ----------------------------Bot-Start---------------------------- #
+
+# --- Add uvloop installation here ---
+uvloop.install()
+# ----------------------------------
+
 
 loop = asyncio.get_event_loop()
 
