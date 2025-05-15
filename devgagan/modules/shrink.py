@@ -23,7 +23,7 @@ from devgagan import app
 from devgagan.core.func import *
 from datetime import datetime, timedelta
 from motor.motor_asyncio import AsyncIOMotorClient
-from config import MONGO_DB, WEBSITE_URL, AD_API, LOG_GROUP  
+from config import MONGO_DB, WEBSITE_URL, AD_API, CONTACT, LOG_GROUP  
 #import devgagan.modules.connectUser  # Correct import path
 #from devgagan.modules.connectUser import register_handlers
  
@@ -208,7 +208,7 @@ async def token_handler(client, message):
     if len(message.command) <= 1:
         image_url = "https://tecolotito.elsiglocoahuila.mx/i/2023/12/2131463.jpeg"
         join_button = InlineKeyboardButton("Join Channel", url="https://t.me/+9FZJh0WMZnE4YWRk")
-        premium = InlineKeyboardButton("Get Premium", url="https://t.me/contact_xbot")   
+        premium = InlineKeyboardButton("Get Premium", url=CONTACT)   
         keyboard = InlineKeyboardMarkup([
             [join_button],   
             [premium]    
