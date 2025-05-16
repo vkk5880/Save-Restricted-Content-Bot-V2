@@ -28,6 +28,8 @@ from datetime import datetime, timedelta
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from devgagan.core.mongo.db import user_sessions_real
 import subprocess
+from telethon.sync import TelegramClient
+from session_converter import SessionManager
 from pyrogram.handlers import MessageHandler, CallbackQueryHandler
 '''
 from devgagan.modules.connect_user import (
