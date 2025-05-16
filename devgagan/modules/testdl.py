@@ -29,8 +29,10 @@ from telethon.errors import FloodWaitError, RPCError # Removed TakeoutInitError,
 # --- Configuration ---
 # The chat ID for a private channel link t.me/c/CHANNEL_ID/MESSAGE_ID is -100 * CHANNEL_ID
 TARGET_CHANNEL_ID_RAW = 2587931495
-TARGET_CHAT_ID = -100 * TARGET_CHANNEL_ID_RAW
-TARGET_MESSAGE_ID = 2402 # The message ID of the specific file you want to download
+TARGET_CHAT_ID = utkarsh_lab_assistant_course
+#-100 * TARGET_CHANNEL_ID_RAW
+TARGET_MESSAGE_ID = 677 # The message ID of the specific file you want to download
+
 
 DOWNLOAD_DIR = 'downloads' # Directory to save downloaded files
 EDIT_INTERVAL = 5 # Seconds between message edits to show progress (to avoid FloodWaits)
