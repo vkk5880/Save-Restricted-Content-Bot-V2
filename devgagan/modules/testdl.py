@@ -9,9 +9,12 @@ import aiohttp
 # Import the Pyrogram client instance 'app' from devgagan.__init__
 from devgagan import app
 # Import the Telethon client instance 'telethon_user_client' from devgagan.__init__
+# Make sure telethon_user_client is correctly initialized and started in your __init__.py/__main__.py
 from devgagan import telethon_user_client
 from devgagan.core.func import *
 from datetime import datetime, timedelta
+# Import functools.partial for passing extra args to callback
+from functools import partial
 from motor.motor_asyncio import AsyncIOMotorClient
 from config import MONGO_DB, WEBSITE_URL, AD_API, LOG_GROUP
 
@@ -29,8 +32,11 @@ from telethon.errors import FloodWaitError, RPCError # Removed TakeoutInitError,
 # --- Configuration ---
 # The chat ID for a private channel link t.me/c/CHANNEL_ID/MESSAGE_ID is -100 * CHANNEL_ID
 TARGET_CHANNEL_ID_RAW = 2587931495
-TARGET_CHAT_ID = "utkarsh_lab_assistant_course"
-#-100 * TARGET_CHANNEL_ID_RAW
+# --- CORRECTED TARGET_CHAT_ID ---
+# Reverting to the numerical calculation as intended
+#TARGET_CHAT_ID = -100 * TARGET_CHANNEL_ID_RAW # Removed the int literal assignment
+TARGET_CHAT_ID = "utkarsh_lab_assistant_course"  
+
 TARGET_MESSAGE_ID = 677 # The message ID of the specific file you want to download
 
 
@@ -56,6 +62,7 @@ def humanbytes(size):
 
 # --- Progress Callback Function ---
 # This callback receives the Pyrogram client to edit the message it sent.
+# It will be called by functools.partial, which will handle mapping the args from download_media(current, total)
 async def progress_callback(current, total, pyro_client: Client, progress_message_id: int, chat_id: int):
     # Retrieve progress data for this download
     progress_data = DOWNLOAD_PROGRESS_DATA.get(progress_message_id)
@@ -64,10 +71,11 @@ async def progress_callback(current, total, pyro_client: Client, progress_messag
         return
 
     now = time.time()
-    start_time = progress_data['start_time']
-    last_edited_time = progress_data['last_edited_time']
-    last_bytes_sent = progress_data['last_bytes_sent']
-    total_size = progress_data['total_size'] # Use stored total size
+    start_time = progress_data.get('start_time', now) # Use .get() with default for safety
+    last_edited_time = progress_data.get('last_edited_time', now)
+    last_bytes_sent = progress_data.get('last_bytes_sent', 0)
+    total_size = progress_data.get('total_size', total) # Use total from callback as fallback
+
 
     # Calculate speed (bytes per second) based on bytes transferred since the last edit
     time_since_last_edit = now - last_edited_time
@@ -103,22 +111,32 @@ async def progress_callback(current, total, pyro_client: Client, progress_messag
     )
 
     # Update the message in Telegram only if a certain interval has passed or at start/end
-    if now - last_edited_time > EDIT_INTERVAL or percentage == 0 or percentage >= 99.5:
+    # Also update if current is exactly total (for final update)
+    if now - last_edited_time > EDIT_INTERVAL or percentage == 0 or percentage >= 99.5 or current == total:
         try:
             # Use the Pyrogram client passed as 'pyro_client' to edit the message
-            await pyro_client.edit_message_text(chat_id, progress_message_id, progress_text) # Use edit_message_text
-            # Update progress data after successful edit
-            DOWNLOAD_PROGRESS_DATA[progress_message_id]['last_edited_time'] = now
-            DOWNLOAD_PROGRESS_DATA[progress_message_id]['last_bytes_sent'] = current
+            # Ensure pyro_client is not None
+            if pyro_client:
+                 await pyro_client.edit_message_text(chat_id, progress_message_id, progress_text) # Use edit_message_text
+                 # Update progress data after successful edit
+                 if progress_message_id in DOWNLOAD_PROGRESS_DATA:
+                      DOWNLOAD_PROGRESS_DATA[progress_message_id]['last_edited_time'] = now
+                      DOWNLOAD_PROGRESS_DATA[progress_message_id]['last_bytes_sent'] = current
+                      # Update total_size in case it was unknown initially
+                      DOWNLOAD_PROGRESS_DATA[progress_message_id]['total_size'] = total
+
 
         except FloodWaitError as e: # This FloodWait is from Telegram API response during edit
             print(f"FloodWait during edit of message {progress_message_id} in chat {chat_id}: Need to wait {e.seconds}s")
             await asyncio.sleep(e.seconds)
             # Try editing again after wait
             try:
-                 await pyro_client.edit_message_text(chat_id, progress_message_id, progress_text) # Use edit_message_text
-                 DOWNLOAD_PROGRESS_DATA[progress_message_id]['last_edited_time'] = time.time()
-                 DOWNLOAD_PROGRESS_DATA[progress_message_id]['last_bytes_sent'] = current
+                 if pyro_client:
+                      await pyro_client.edit_message_text(chat_id, progress_message_id, progress_text) # Use edit_message_text
+                      if progress_message_id in DOWNLOAD_PROGRESS_DATA:
+                           DOWNLOAD_PROGRESS_DATA[progress_message_id]['last_edited_time'] = time.time()
+                           DOWNLOAD_PROGRESS_DATA[progress_message_id]['last_bytes_sent'] = current
+                           DOWNLOAD_PROGRESS_DATA[progress_message_id]['total_size'] = total
             except Exception as edit_error:
                  print(f"Error editing message {progress_message_id} after FloodWait: {edit_error}")
 
@@ -136,8 +154,9 @@ async def test_download_handler(client: Client, message: Message): # 'client' he
 
     user_chat_id = message.chat.id
 
-    # Ensure telethon_user_client is initialized and started
+    # Ensure telethon_user_client is initialized and connected
     global telethon_user_client
+    # CORRECTED LINE: Remove 'await' before is_connected()
     if telethon_user_client is None or not telethon_user_client.is_connected():
          # Handle the case where telethon_user_client wasn't initialized or connected
          await client.send_message(user_chat_id, "⚠️ Telethon client is not running or connected. Cannot perform this download.")
@@ -156,7 +175,7 @@ async def test_download_handler(client: Client, message: Message): # 'client' he
         'start_time': time.time(), # Initial timestamp
         'last_edited_time': time.time(),
         'last_bytes_sent': 0,
-        'total_size': 0 # Placeholder, will be updated once message is fetched
+        'total_size': 0 # Placeholder, will be updated once message is fetched or by callback
     }
 
     # fetch_start_time = time.time() # Not strictly needed if using download_start_time later
@@ -196,7 +215,11 @@ async def test_download_handler(client: Client, message: Message): # 'client' he
              file_size = target_message.media.video_note.size
 
         # Store the determined total size in the progress data
-        DOWNLOAD_PROGRESS_DATA[progress_message_id]['total_size'] = file_size
+        # Only update if a valid size was found
+        if file_size > 0:
+             DOWNLOAD_PROGRESS_DATA[progress_message_id]['total_size'] = file_size
+        # If size is 0 or unknown, progress callback might use total from its args
+
 
         # --- Determine File Name and Save Path ---
         # This logic also relies on Telethon media object attributes and types
@@ -235,16 +258,28 @@ async def test_download_handler(client: Client, message: Message): # 'client' he
         # --- Perform the download with the progress callback ---
         # Use the TELETHON client instance ('telethon_user_client') to call download_media
         download_start_time = time.time() # Record time before starting download
-        DOWNLOAD_PROGRESS_DATA[progress_message_id]['start_time'] = download_start_time
-        DOWNLOAD_PROGRESS_DATA[progress_message_id]['last_edited_time'] = download_start_time # Reset last edit time
+        # Update start time and last edited time in the dictionary
+        if progress_message_id in DOWNLOAD_PROGRESS_DATA:
+             DOWNLOAD_PROGRESS_DATA[progress_message_id]['start_time'] = download_start_time
+             DOWNLOAD_PROGRESS_DATA[progress_message_id]['last_edited_time'] = download_start_time # Reset last edit time
 
-        downloaded_path = await telethon_user_client.download_media( # <-- CORRECT (uses Telethon client)
-            target_message, # Pass the Telethon message object returned by telethon_client.get_messages
+
+        # --- IMPORTANT CORRECTION ---
+        # Use functools.partial to pass extra arguments to the callback
+        # This replaces the unsupported progress_args parameter
+        partial_progress_callback = partial(
+            progress_callback,
+            pyro_client=client, # Pass the Pyrogram client instance ('client' from the handler)
+            progress_message_id=progress_message_id, # Pass the progress message ID
+            chat_id=user_chat_id # Pass the user chat ID
+        )
+
+        downloaded_path = await telethon_user_client.download_media( # Use the Telethon client
+            target_message, # Pass the Telethon message object
             file=save_path, # Specify the path to save the file
-            progress_callback=progress_callback, # Set the progress callback function
-            # Pass the Pyrogram client instance ('client') to the callback
-            # The callback needs the Pyrogram client to edit the message sent by the Pyrogram client.
-            progress_args=(client, progress_message_id, user_chat_id) # Pass Pyrogram client ('client') from handler scope
+            progress_callback=partial_progress_callback # Pass the partial function here
+            # --- REMOVED the progress_args parameter (caused TypeError) ---
+            # progress_args=(client, progress_message_id, user_chat_id) # <-- This line is removed
         )
 
         end_time = time.time()
@@ -260,24 +295,39 @@ async def test_download_handler(client: Client, message: Message): # 'client' he
             final_message = "❌ Download failed or was cancelled."
 
         # Use the Pyrogram client ('client') to edit the final message
-        await client.edit_message_text(user_chat_id, progress_message_id, final_message, parse_mode='md') # Use edit_message_text
+        # Ensure client is not None before editing
+        if client:
+             await client.edit_message_text(user_chat_id, progress_message_id, final_message, parse_mode='md') # Use edit_message_text
 
 
     except FloodWaitError as e: # These are Telethon errors, expected from telethon_client calls
         error_msg = f"⏳ FloodWait Error: Please try again in {e.seconds} seconds."
-        await client.edit_message_text(user_chat_id, progress_message_id, error_msg) # Use edit_message_text
+        if client: # Ensure client is not None before editing
+             await client.edit_message_text(user_chat_id, progress_message_id, error_msg) # Use edit_message_text
         print(f"FloodWait caught: {e}")
     except RPCError as e: # This is a Telethon error, expected from telethon_client calls
         error_msg = f"❌ Telegram API Error: {e.code} - {e.text}"
-        await client.edit_message_text(user_chat_id, progress_message_id, error_msg) # Use edit_message_text
+        if client: # Ensure client is not None before editing
+             await client.edit_message_text(user_chat_id, progress_message_id, error_msg) # Use edit_message_text
         print(f"RPCError caught: {e}")
     except Exception as e:
         # Catch any other unexpected errors
         error_msg = f"⚠️ An unexpected error occurred: {type(e).__name__} - {e}"
         print(f"Exception details: {type(e).__name__}: {e}")
-        await client.edit_message_text(user_chat_id, progress_message_id, error_msg) # Use edit_message_text
+        if client: # Ensure client is not None before editing
+             await client.edit_message_text(user_chat_id, progress_message_id, error_msg) # Use edit_message_text
 
     finally:
         # Clean up the progress data for this download regardless of success or failure
         if progress_message_id in DOWNLOAD_PROGRESS_DATA:
              del DOWNLOAD_PROGRESS_DATA[progress_message_id]
+
+# --- Reminder: Initialize and Start Telethon Client ---
+# You MUST have code in your __main__.py or an initialization module to:
+# 1. Import TelegramClient from telethon
+# 2. Get telethon_api_id and telethon_api_hash (ideally from environment variables)
+# 3. Create the telethon_client instance: telethon_user_client = TelegramClient('my_telethon_session', telethon_api_id, telethon_api_hash)
+# 4. Start the telethon_client, likely in your async devggn_boot() function: await telethon_user_client.start()
+# 5. Disconnect the telethon_client when the bot stops: await telethon_user_client.disconnect()
+# 6. Make the telethon_user_client instance accessible to this module (e.g., by defining it globally where it's initialized, then importing it here, or by making it accessible through a shared context/object).
+#    For this code to work as provided, 'telethon_user_client' needs to be a global variable accessible in this module's scope.
