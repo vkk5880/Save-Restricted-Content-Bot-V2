@@ -227,13 +227,13 @@ async def is_normal_tg_link(link: str) -> bool:
     special_identifiers = ['t.me/+', 't.me/c/', 't.me/b/', 'tg://openmessage']
     return 't.me/' in link and not any(x in link for x in special_identifiers)
     
-async def process_special_links(userbot, user_id, msg, link):
+async def process_special_links(userbot, telethonclient, user_id, msg, link):
     """Handle special Telegram links."""
     if 't.me/+' in link:
         result = await userbot_join(userbot, link)
         await msg.edit_text(result)
     elif any(sub in link for sub in ['t.me/c/', 't.me/b/', '/s/', 'tg://openmessage']):
-        await process_and_upload_link(userbot, user_id, msg.id, link, 0, msg)
+        await process_and_upload_link(userbot, telethonclient, user_id, msg.id, link, 0, msg)
         await set_interval(user_id, interval_minutes=45)
     else:
         await msg.edit_text("Invalid link format.")
@@ -309,6 +309,7 @@ async def batch_link(_, message):
     try:
         normal_links_handled = False
         userbot = await initialize_userbot(user_id)
+        telethonclient  = await initialize_telethon_userbot(user_id)
         # Handle normal links first
         for i in range(cs, cs + cl):
             if user_id in users_loop and users_loop[user_id]:
@@ -317,7 +318,7 @@ async def batch_link(_, message):
                 # Process t.me links (normal) without userbot
                 if 't.me/' in link and not any(x in link for x in ['t.me/b/', 't.me/c/', 'tg://openmessage']):
                     msg = await app.send_message(message.chat.id, f"Processing...")
-                    await process_and_upload_link(userbot, user_id, msg.id, link, 0, message)
+                    await process_and_upload_link(userbot, telethonclient, user_id, msg.id, link, 0, message)
                     await pin_msg.edit_text(
                         f"Batch process started ⚡\nProcessing: {i - cs + 1}/{cl}\n\n****",
                         reply_markup=keyboard
@@ -343,7 +344,7 @@ async def batch_link(_, message):
                 link = get_link(url)
                 if any(x in link for x in ['t.me/b/', 't.me/c/']):
                     msg = await app.send_message(message.chat.id, f"Processing...")
-                    await process_and_upload_link(userbot, user_id, msg.id, link, 0, message)
+                    await process_and_upload_link(userbot, telethonclient, user_id, msg.id, link, 0, message)
                     await pin_msg.edit_text(
                         f"Batch process started ⚡\nProcessing: {i - cs + 1}/{cl}\n\n****",
                         reply_markup=keyboard
