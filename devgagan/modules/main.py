@@ -173,16 +173,28 @@ async def initialize_userbot(user_id): # this ensure the single startup .. even 
     return None
 
 
-async def convert_user_string(user_id):
+async def convert_user_string(pyrogram_string: str):
     # Convert to Telethon session
-    session_manager = SessionManager.from_pyrogram_string_session(pyrogram_session_string)
-    # Access the converted session details
-    print(session_manager.session)
 
-    # Export the session as a Telethon string
-    telethon_session_string = session_manager.telethon_string_session()
-    print(telethon_session_string)
-    return telethon_session_string
+    if not pyrogram_string:
+        print("Error: Pyrogram session string provided to conversion is empty.")
+        return None
+
+
+    try:
+        # Convert to Telethon session
+        # from_pyrogram_string_session requires the API_ID
+        session_manager = SessionManager.from_pyrogram_string_session(pyrogram_string, api_id=API_ID)
+
+        # Export the session as a Telethon string
+        telethon_session_string = session_manager.telethon_string_session()
+        # Optional: print(telethon_session_string)
+        return telethon_session_string
+
+    except Exception as e:
+        print(f"Error during session conversion: {e}")
+        # You might want more specific error handling here
+        return None
 
 
 
@@ -190,7 +202,7 @@ async def initialize_telethon_userbot(user_id): # this ensure the single startup
     """Initialize the userbot session for the given user."""
     data = await db.get_data(user_id)
     if data and data.get("session"):
-        await telethon_string = convert_user_string(user_id)
+        telethon_string = await convert_user_string(data.get("session"))
         try:
             device = 'iPhone 16 Pro' # added gareebi text
             telethon_userbot = TelegramClient(
