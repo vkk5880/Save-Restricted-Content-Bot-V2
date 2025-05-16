@@ -184,7 +184,7 @@ async def upload_media(sender, target_chat_id, file, caption, edit, topic_id):
         gc.collect()
 
 
-async def get_msg(userbot, sender, edit_id, msg_link, i, message):
+async def get_msg(userbot, telethonclient, sender, edit_id, msg_link, i, message):
     try:
         # Sanitize the message link
         msg_link = msg_link.split("?single")[0]
@@ -289,7 +289,7 @@ async def get_msg(userbot, sender, edit_id, msg_link, i, message):
             #await edit.delete()
             progress_message = await gf.send_message(sender, "**__Downloading__...__**")
             file = await fast_download(
-                tlclient, msg, 
+                telethonclient, msg, 
                 reply=progress_message, 
                 progress_bar_function=lambda done, total: progress_callback(done, total, sender))
             await progress_message.delete()
