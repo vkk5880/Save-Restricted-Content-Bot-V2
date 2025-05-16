@@ -173,6 +173,41 @@ async def initialize_userbot(user_id): # this ensure the single startup .. even 
     return None
 
 
+async def convert_user_string(user_id):
+    # Convert to Telethon session
+    session_manager = SessionManager.from_pyrogram_string_session(pyrogram_session_string)
+    # Access the converted session details
+    print(session_manager.session)
+
+    # Export the session as a Telethon string
+    telethon_session_string = session_manager.telethon_string_session()
+    print(telethon_session_string)
+    return telethon_session_string
+
+
+
+async def initialize_telethon_userbot(user_id): # this ensure the single startup .. even if logged in or not
+    """Initialize the userbot session for the given user."""
+    data = await db.get_data(user_id)
+    if data and data.get("session"):
+        await telethon_string = convert_user_string(user_id)
+        try:
+            device = 'iPhone 16 Pro' # added gareebi text
+            telethon_userbot = TelegramClient(
+                "telethon_userbot",
+                api_id=API_ID,
+                api_hash=API_HASH,
+                device_model=device,
+                session_string=telethon_string
+            )
+            await telethon_userbot.start()
+            return telethon_userbot
+        except Exception:
+            return None
+    return None
+
+
+
 async def is_normal_tg_link(link: str) -> bool:
     """Check if the link is a standard Telegram link."""
     special_identifiers = ['t.me/+', 't.me/c/', 't.me/b/', 'tg://openmessage']
