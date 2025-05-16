@@ -39,10 +39,9 @@ app = Client(
     parse_mode=ParseMode.MARKDOWN
 )
 
-pro = Client("ggbot", api_id=API_ID, api_hash=API_HASH, session_string=STRING,  workers=8, max_concurrent_transmissions=8)
+pro = Client("ggbot", api_id=API_ID, api_hash=API_HASH, session_string=STRING,  workers=80, max_concurrent_transmissions=80)
 
-telethon_user_client = TelegramClient('sexrepo', API_ID, API_HASH ,  workers=8,
-    max_concurrent_transmissions=8).start(bot_token=BOT_TOKEN)
+telethon_user_client = TelegramClient('sexrepo', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 
 
 # MongoDB setup
