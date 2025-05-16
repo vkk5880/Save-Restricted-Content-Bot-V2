@@ -137,7 +137,7 @@ async def single_link(_, message):
             await set_interval(user_id, interval_minutes=45)
         else:
             # Handle special Telegram links
-            await process_special_links(userbot, user_id, msg, link)
+            await process_special_links(userbot, telethonclient, user_id, msg, link)
             
     except FloodWait as fw:
         await msg.edit_text(f'Try again after {fw.x} seconds due to floodwait from Telegram.')
