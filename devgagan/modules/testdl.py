@@ -17,7 +17,7 @@ from datetime import datetime, timedelta
 from functools import partial
 from motor.motor_asyncio import AsyncIOMotorClient
 from config import MONGO_DB, WEBSITE_URL, AD_API, LOG_GROUP
-
+from pyrogram.enums import ParseMode 
 
 import time
 import math
@@ -297,7 +297,7 @@ async def test_download_handler(client: Client, message: Message): # 'client' he
         # Use the Pyrogram client ('client') to edit the final message
         # Ensure client is not None before editing
         if client:
-             await client.edit_message_text(user_chat_id, progress_message_id, final_message, parse_mode='md') # Use edit_message_text
+             await client.edit_message_text(user_chat_id, progress_message_id, final_message, parse_mode=ParseMode.MARKDOWN') # Use edit_message_text
 
 
     except FloodWaitError as e: # These are Telethon errors, expected from telethon_client calls
