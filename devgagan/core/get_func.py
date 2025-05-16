@@ -66,23 +66,6 @@ async def fetch_upload_method(user_id):
     return user_data.get("upload_method", "Pyrogram") if user_data else "Pyrogram"
 
 
-async def convert_user_string():
-    # Convert to Telethon session
-    session_manager = SessionManager.from_pyrogram_string_session(pyrogram_session_string)
-    # Access the converted session details
-    print(session_manager.session)
-
-    # Export the session as a Telethon string
-     telethon_session_string = session_manager.telethon_string_session()  
-     print(telethon_session_string)
-
-
-
-
-    
-    return user_data.get("upload_method", "Pyrogram") if user_data else "Pyrogram"
-
-
 async def format_caption_to_html(caption: str) -> str:
     caption = re.sub(r"^> (.*)", r"<blockquote>\1</blockquote>", caption, flags=re.MULTILINE)
     caption = re.sub(r"```(.*?)```", r"<pre>\1</pre>", caption, flags=re.DOTALL)
