@@ -269,12 +269,32 @@ async def get_msg(userbot, sender, edit_id, msg_link, i, message):
         edit = await app.edit_message_text(sender, edit_id, "**Downloading...**")
 
         # Download media
-        file = await userbot.download_media(
+
+        
+        upload_method = await fetch_upload_method(sender)  # Fetch the upload method (Pyrogram or Telethon)
+
+        # Pyrogram Download
+        if upload_method == "Pyrogram":
+            file = await userbot.download_media(
             msg,
             file_name=file_name,
             progress=progress_bar,
             progress_args=("╭─────────────────────╮\n│      **__Downloading__...**\n├─────────────────────", edit, time.time())
         )
+
+
+
+         # Telethon __Downloading__
+        elif upload_method == "Telethon":
+            #await edit.delete()
+            progress_message = await gf.send_message(sender, "**__Downloading__...__**")
+            file = await fast_download(
+                tlclient, msg, 
+                reply=progress_message, 
+                progress_bar_function=lambda done, total: progress_callback(done, total, sender))
+            await progress_message.delete()
+        
+        
         
         caption = await get_final_caption(msg, sender)
 
