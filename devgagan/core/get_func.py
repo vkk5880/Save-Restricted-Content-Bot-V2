@@ -58,6 +58,9 @@ else:
     
 async def fetch_upload_method(user_id):
     """Fetch the user's preferred upload method."""
+    if not pro:
+        return "Pyrogram" # Always Pyrogram for non-pro
+
     user_data = collection.find_one({"user_id": user_id})
     return user_data.get("upload_method", "Pyrogram") if user_data else "Pyrogram"
 
