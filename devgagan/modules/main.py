@@ -63,9 +63,9 @@ register_handlers(connect_app)
 connect_app.run()
 
 '''
-async def process_and_upload_link(userbot, user_id, msg_id, link, retry_count, message):
+async def process_and_upload_link(userbot, telethonclient, user_id, msg_id, link, retry_count, message):
     try:
-        await get_msg(userbot, user_id, msg_id, link, retry_count, message)
+        await get_msg(userbot, telethonclient,  user_id, msg_id, link, retry_count, message)
         await asyncio.sleep(15)
     finally:
         pass
@@ -129,11 +129,11 @@ async def single_link(_, message):
     link = message.text if "tg://openmessage" in message.text else get_link(message.text)
     msg = await message.reply("Processing...")
     userbot = await initialize_userbot(user_id)
-
+    telethonclient  = await initialize_telethon_userbot(user_id)
     try:
         if await is_normal_tg_link(link):
             # Pass userbot if available; handle normal Telegram links
-            await process_and_upload_link(userbot, user_id, msg.id, link, 0, message)
+            await process_and_upload_link(userbot, telethonclient, user_id, msg.id, link, 0, message)
             await set_interval(user_id, interval_minutes=45)
         else:
             # Handle special Telegram links
