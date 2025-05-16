@@ -20,4 +20,5 @@ mutagen
 yt-dlp
 speedtest-cli
 uvloop
-telegram-session-converter
+session-converter
+#telegram-session-converter
