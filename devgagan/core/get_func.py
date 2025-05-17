@@ -296,7 +296,7 @@ async def get_msg(userbot, telethonclient, sender, edit_id, msg_link, i, message
         elif upload_methods == "Telethon":
             #await edit.delete()
             progress_messagee = await gf.send_message(sender, "**__Downloading__...__**")
-            print(f"progress_messagee ... {progress_messagee}")
+            #print(f"progress_messagee ... {progress_messagee}")
 
             
             # Fetch the message using the Telethon client
