@@ -186,7 +186,7 @@ async def convert_user_string(pyrogram_string: str):
     try:
         # Convert to Telethon session
         # from_pyrogram_string_session requires the API_ID
-        session_manager = SessionManager.from_pyrogram_string_session(pyrogram_string, api_id=API_ID)
+        session_manager = SessionManager.from_pyrogram_string_session(pyrogram_string)
 
         # Export the session as a Telethon string
         telethon_session_string = session_manager.telethon_string_session()
