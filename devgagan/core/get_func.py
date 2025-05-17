@@ -69,7 +69,8 @@ async def fetch_upload_method(user_id):
 
     user_data = collection.find_one({"user_id": user_id})
     #print(f"fetch_upload_method ... {user_data.get('upload_method', 'Pyrogram')}")
-    return user_data.get("upload_method", "Pyrogram") if user_data else "Pyrogram"
+    return "Pyrogram"
+    #user_data.get("upload_method", "Pyrogram") if user_data else "Pyrogram"
 
 
 async def format_caption_to_html(caption: str) -> str:
