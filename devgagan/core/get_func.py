@@ -68,7 +68,7 @@ async def fetch_upload_method(user_id):
         return "Pyrogram" # Always Pyrogram for non-pro
 
     user_data = collection.find_one({"user_id": user_id})
-    print(f"fetch_upload_method ... {user_data.get('upload_method', 'Pyrogram')}")
+    #print(f"fetch_upload_method ... {user_data.get('upload_method', 'Pyrogram')}")
     return user_data.get("upload_method", "Pyrogram") if user_data else "Pyrogram"
 
 
@@ -276,7 +276,8 @@ async def get_msg(userbot, telethonclient, sender, edit_id, msg_link, i, message
 
 
         upload_methods = await fetch_upload_method(sender)  # Fetch the upload method (Pyrogram or Telethon)
-        #print(f"upload_method ... {upload_methods}")
+        print(f"upload_method ... {upload_methods}")
+        await asyncio.sleep(5)
 
         # Pyrogram Download
         if upload_methods == "Pyrogram":
@@ -295,11 +296,15 @@ async def get_msg(userbot, telethonclient, sender, edit_id, msg_link, i, message
                 if not telethon_message:
                     await progress_messagee.edit("Failed to fetch message with Telethon client.")
                     await progress_messagee.delete(2)
+                    print("telethon_message error")
                     return # Exit the function if message fetching fails
             except Exception as e:
                 await progress_messagee.edit(f"Error fetching message with Telethon: {e}")
                 await progress_messagee.delete(2)
+                print("telethon_message error2")
                 return # Exit the function on error
+
+            print("fast_download start")
             file = await fast_download(
                 telethonclient, telethon_message, # Pass the Telethon message object
                 reply=progress_messagee,
