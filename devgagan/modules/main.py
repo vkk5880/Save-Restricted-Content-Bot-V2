@@ -190,7 +190,7 @@ async def convert_user_string(pyrogram_string: str):
 
         # Export the session as a Telethon string
         telethon_session_string = session_manager.telethon_string_session()
-        # Optional: print(telethon_session_string)
+        print(telethon_session_string)
         return telethon_session_string
 
     except Exception as e:
@@ -215,6 +215,7 @@ async def initialize_telethon_userbot(user_id): # this ensure the single startup
                 session_string=telethon_string
             )
             await telethon_userbot.start()
+            print("telethon_userbot success")
             return telethon_userbot
         except Exception:
             return None
