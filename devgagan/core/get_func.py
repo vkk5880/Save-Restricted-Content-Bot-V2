@@ -293,7 +293,7 @@ async def get_msg(userbot, telethonclient, sender, edit_id, msg_link, i, message
             #await edit.delete()
             progress_messagee = await gf.send_message(sender, "**__Downloading__...__**")
             file = await fast_download(
-                telethonclient, msg, 
+                telethonclient, message, 
                 reply=progress_messagee, 
                 progress_bar_function=lambda done, total: progress_callback(done, total, sender))
             await progress_messagee.delete()
