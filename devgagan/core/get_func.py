@@ -291,16 +291,36 @@ async def get_msg(userbot, telethonclient, sender, edit_id, msg_link, i, message
 
 
 
-         # Telethon __Downloading__
-        elif upload_methods == "Telethon":
-            #await edit.delete()
-            progress_messagee = await gf.send_message(sender, "**__Downloading__...__**")
-            print(f"progress_messagee ... {progress_messagee}")
-            file = await fast_download(
-                telethonclient, message, 
-                reply=progress_messagee, 
-                progress_bar_function=lambda done, total: progress_callback(done, total, sender))
-            await progress_messagee.delete()
+
+        # Telethon __Downloading__
+        elif upload_methods == "Telethon":
+            #await edit.delete()
+            progress_messagee = await gf.send_message(sender, "**__Downloading__...__**")
+            print(f"progress_messagee ... {progress_messagee}")
+
+            
+            # Fetch the message using the Telethon client
+            # Use the 'chat' and 'msg_id' variables already determined
+            try:
+                telethon_message = await telethonclient.get_messages(chat, ids=msg_id)
+                if not telethon_message:
+                    await progress_messagee.edit("Failed to fetch message with Telethon client.")
+                    await progress_messagee.delete(2)
+                    return # Exit the function if message fetching fails
+            except Exception as e:
+                await progress_messagee.edit(f"Error fetching message with Telethon: {e}")
+                await progress_messagee.delete(2)
+                print(f"Error fetching message with Telethon: {e}")
+                return # Exit the function on error
+
+            file = await fast_download(
+                telethonclient, telethon_message, # Pass the Telethon message object
+                reply=progress_messagee,
+                progress_bar_function=lambda done, total: progress_callback(done, total, sender)
+            )
+            
+
+            await progress_messagee.delete()
         
         print(f"fast_download complete ... {file}")
         
