@@ -31,6 +31,8 @@ import subprocess
 from telethon.sync import TelegramClient
 from session_converter import SessionManager
 from pyrogram.handlers import MessageHandler, CallbackQueryHandler
+
+from devgagan.modules.shrink import is_user_verified
 '''
 from devgagan.modules.connect_user import (
     connect_user, 
@@ -63,6 +65,21 @@ register_handlers(connect_app)
 connect_app.run()
 
 '''
+
+async def fetch_upload_method(user_id):
+    """Fetch the user's preferred upload method."""
+    freecheck = await chk_user(message, user_id)
+    if freecheck == 1 and user_id not in OWNER_ID and not await is_user_verified(user_id):
+        print("Always Pyrogram for non-pro ...")
+        return "Pyrogram" # Always Pyrogram for non-pro
+
+    user_data = collection.find_one({"user_id": user_id})
+    #print(f"fetch_upload_method ... {user_data.get('upload_method', 'Pyrogram')}")
+    return "Pyrogram"
+    #user_data.get("upload_method", "Pyrogram") if user_data else "Pyrogram"
+
+
+
 async def process_and_upload_link(userbot, telethonclient, user_id, msg_id, link, retry_count, message):
     print("process_and_upload_link method.")
     try:
@@ -129,6 +146,10 @@ async def single_link(_, message):
 
     link = message.text if "tg://openmessage" in message.text else get_link(message.text)
     msg = await message.reply("Processing...")
+
+    upload_methods = await fetch_upload_method(sender)  # Fetch the upload method (Pyrogram or Telethon)
+        print(f"upload_method ... {upload_methods}")
+    
     userbot = await initialize_userbot(user_id)
     telethonclient  = await initialize_telethon_userbot(user_id)
     try:
