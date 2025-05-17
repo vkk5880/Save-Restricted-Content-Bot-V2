@@ -64,6 +64,7 @@ connect_app.run()
 
 '''
 async def process_and_upload_link(userbot, telethonclient, user_id, msg_id, link, retry_count, message):
+    print("process_and_upload_link.")
     try:
         await get_msg(userbot, telethonclient,  user_id, msg_id, link, retry_count, message)
         await asyncio.sleep(15)
@@ -133,6 +134,7 @@ async def single_link(_, message):
     try:
         if await is_normal_tg_link(link):
             # Pass userbot if available; handle normal Telegram links
+            print("process_and_upload_link.")
             await process_and_upload_link(userbot, telethonclient, user_id, msg.id, link, 0, message)
             await set_interval(user_id, interval_minutes=45)
         else:
