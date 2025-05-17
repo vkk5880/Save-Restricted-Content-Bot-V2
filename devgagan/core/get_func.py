@@ -64,9 +64,11 @@ async def fetch_upload_method(user_id):
     """Fetch the user's preferred upload method."""
     freecheck = await chk_user(message, user_id)
     if freecheck == 1 and user_id not in OWNER_ID and not await is_user_verified(user_id):
+        print("Always Pyrogram for non-pro ...")
         return "Pyrogram" # Always Pyrogram for non-pro
 
     user_data = collection.find_one({"user_id": user_id})
+    print(f"fetch_upload_method ... {user_data.get("upload_method", "Pyrogram")}")
     return user_data.get("upload_method", "Pyrogram") if user_data else "Pyrogram"
 
 
@@ -276,6 +278,7 @@ async def get_msg(userbot, telethonclient, sender, edit_id, msg_link, i, message
 
         
         upload_methods = await fetch_upload_method(sender)  # Fetch the upload method (Pyrogram or Telethon)
+        print(f"upload_method ... {upload_methods}")
 
         # Pyrogram Download
         if upload_methods == "Pyrogram":
@@ -292,13 +295,14 @@ async def get_msg(userbot, telethonclient, sender, edit_id, msg_link, i, message
         elif upload_methods == "Telethon":
             #await edit.delete()
             progress_messagee = await gf.send_message(sender, "**__Downloading__...__**")
+            print(f"progress_messagee ... {progress_messagee}")
             file = await fast_download(
                 telethonclient, message, 
                 reply=progress_messagee, 
                 progress_bar_function=lambda done, total: progress_callback(done, total, sender))
             await progress_messagee.delete()
         
-        
+        print(f"fast_download complete ... {file}")
         
         caption = await get_final_caption(msg, sender)
 
