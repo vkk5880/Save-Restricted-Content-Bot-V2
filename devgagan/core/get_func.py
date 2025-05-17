@@ -35,6 +35,9 @@ from devgagan.core.mongo.db import set_session, remove_session, get_data
 from telethon import TelegramClient, events, Button
 from devgagantools import fast_upload
 from session_converter import SessionManager
+from devgagan.core.func import *
+from devgagan.modules.shrink import is_user_verified
+
 
 def thumbnail(sender):
     return f'{sender}.jpg' if os.path.exists(f'{sender}.jpg') else None
@@ -59,7 +62,8 @@ else:
     
 async def fetch_upload_method(user_id):
     """Fetch the user's preferred upload method."""
-    if not pro:
+    freecheck = await chk_user(message, user_id)
+    if freecheck == 1 and user_id not in OWNER_ID and not await is_user_verified(user_id):
         return "Pyrogram" # Always Pyrogram for non-pro
 
     user_data = collection.find_one({"user_id": user_id})
