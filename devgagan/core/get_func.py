@@ -190,7 +190,6 @@ async def upload_media(sender, target_chat_id, file, caption, edit, topic_id):
         gc.collect()
 
 
-
 async def get_msg(userbot, telethonclient, sender, edit_id, msg_link, i, message):
     try:
         # Sanitize the message link
@@ -205,7 +204,7 @@ async def get_msg(userbot, telethonclient, sender, edit_id, msg_link, i, message
             parts = msg_link.split("/")
             if 't.me/b/' in msg_link:
                 chat = parts[-2]
-                msg_id = int(parts[-1]) + i # fixed bot problem 
+                msg_id = int(parts[-1]) + i # fixed bot problem
             else:
                 chat = int('-100' + parts[parts.index('c') + 1])
                 msg_id = int(parts[-1]) + i
@@ -216,23 +215,23 @@ async def get_msg(userbot, telethonclient, sender, edit_id, msg_link, i, message
                     "Sorry! This channel is protected by **Admin**."
                 )
                 return
-            
+
         elif '/s/' in msg_link: # fixed story typo
             edit = await app.edit_message_text(sender, edit_id, "Story Link Dictected...")
             if userbot is None:
-                await edit.edit("Login in bot save stories...")     
+                await edit.edit("Login in bot save stories...")
                 return
             parts = msg_link.split("/")
             chat = parts[3]
-            
-            if chat.isdigit():   # this is for channel stories
+
+            if chat.isdigit():    # this is for channel stories
                 chat = f"-100{chat}"
-            
+
             msg_id = int(parts[-1])
             await download_user_stories(userbot, chat, msg_id, edit, sender)
             await edit.delete(2)
             return
-        
+
         else:
             edit = await app.edit_message_text(sender, edit_id, "Public link detected...")
             chat = msg_link.split("t.me/")[1].split("/")[0]
@@ -240,7 +239,7 @@ async def get_msg(userbot, telethonclient, sender, edit_id, msg_link, i, message
             await copy_message_with_chat_id(app, userbot, sender, chat, msg_id, edit)
             await edit.delete(2)
             return
-            
+
         # Fetch the target message
         msg = await userbot.get_messages(chat, msg_id)
         if not msg or msg.service or msg.empty:
@@ -264,7 +263,7 @@ async def get_msg(userbot, telethonclient, sender, edit_id, msg_link, i, message
             await handle_sticker(app, msg, target_chat_id, topic_id, edit_id, LOG_GROUP)
             return
 
-        
+
         # Handle file media (photo, document, video)
         file_size = get_message_file_size(msg)
 
@@ -275,9 +274,7 @@ async def get_msg(userbot, telethonclient, sender, edit_id, msg_link, i, message
         file_name = await get_media_filename(msg)
         edit = await app.edit_message_text(sender, edit_id, "**Downloading...**")
 
-        # Download media
 
-        
         upload_methods = await fetch_upload_method(sender)  # Fetch the upload method (Pyrogram or Telethon)
         #print(f"upload_method ... {upload_methods}")
 
@@ -285,14 +282,14 @@ async def get_msg(userbot, telethonclient, sender, edit_id, msg_link, i, message
         if upload_methods == "Pyrogram":
             file = await userbot.download_media(
                 msg,
-            file_name=file_name,
-            progress=progress_bar,
-            progress_args=("╭─────────────────────╮\n│      **__Downloading__...**\n├─────────────────────", edit, time.time())
+                file_name=file_name,
+                progress=progress_bar,
+                progress_args=("╭─────────────────────╮\n│      **__Downloading__...**\n├─────────────────────", edit, time.time())
             )
-            # Telethon __Downloading__
-        elif upload_methods == "Telethon":
-            #await edit.delete()
-            progress_messagee = await gf.send_message(sender, "**__Downloading__...__**")
+        # Telethon __Downloading__
+        elif upload_methods == "Telethon":
+            #await edit.delete()
+            progress_messagee = await gf.send_message(sender, "**__Downloading__...__**")
             try:
                 telethon_message = await telethonclient.get_messages(chat, ids=msg_id)
                 if not telethon_message:
@@ -303,12 +300,12 @@ async def get_msg(userbot, telethonclient, sender, edit_id, msg_link, i, message
                 await progress_messagee.edit(f"Error fetching message with Telethon: {e}")
                 await progress_messagee.delete(2)
                 return # Exit the function on error
-            file = await fast_download(
-                telethonclient, telethon_message, # Pass the Telethon message object
-                reply=progress_messagee,
-                progress_bar_function=lambda done, total: progress_callback(done, total, sender)
-            )
-              await progress_messagee.delete()
+            file = await fast_download(
+                telethonclient, telethon_message, # Pass the Telethon message object
+                reply=progress_messagee,
+                progress_bar_function=lambda done, total: progress_callback(done, total, sender)
+            )
+            await progress_messagee.delete()
         caption = await get_final_caption(msg, sender)
 
         # Rename file
@@ -318,7 +315,7 @@ async def get_msg(userbot, telethonclient, sender, edit_id, msg_link, i, message
             await result.copy(LOG_GROUP)
             await edit.delete(2)
             return
-        
+
         if msg.voice:
             result = await app.send_voice(target_chat_id, file, reply_to_message_id=topic_id)
             await result.copy(LOG_GROUP)
@@ -343,17 +340,13 @@ async def get_msg(userbot, telethonclient, sender, edit_id, msg_link, i, message
     except Exception as e:
         # await app.edit_message_text(sender, edit_id, f"Failed to save: `{msg_link}`\n\nError: {str(e)}")
         #print(f"Error: {e}")
+        pass
     finally:
         # Clean up
         if file and os.path.exists(file):
             os.remove(file)
         if edit:
             await edit.delete(2)
-        
-
-
-
-
 
 
 
