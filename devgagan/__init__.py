@@ -20,13 +20,18 @@ from config import API_ID, API_HASH, BOT_TOKEN, STRING, MONGO_DB
 from telethon.sync import TelegramClient
 from motor.motor_asyncio import AsyncIOMotorClient
 import time
+import sys
 
 loop = asyncio.get_event_loop()
+ 
 
 logging.basicConfig(
-    format="[%(levelname) 5s/%(asctime)s] %(name)s: %(message)s",
-    level=logging.INFO,
+    format='[%(levelname)s/%(asctime)s] %(name)s: %(message)s',  
+    level=logging.INFO, # Set the minimum logging level to capture (e.g., logging.INFO, logging.DEBUG)
+    stream=sys.stdout # Direct log output to standard output
 )
+
+
 
 botStartTime = time.time()
 
