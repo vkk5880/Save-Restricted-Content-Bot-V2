@@ -68,7 +68,7 @@ async def fetch_upload_method(user_id):
         return "Pyrogram" # Always Pyrogram for non-pro
 
     user_data = collection.find_one({"user_id": user_id})
-    print(f"fetch_upload_method ... {user_data.get("upload_method", "Pyrogram")}")
+    print(f"fetch_upload_method ... {user_data.get('upload_method', 'Pyrogram')}")
     return user_data.get("upload_method", "Pyrogram") if user_data else "Pyrogram"
 
 
