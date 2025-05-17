@@ -296,7 +296,7 @@ async def get_msg(userbot, telethonclient, sender, edit_id, msg_link, i, message
         elif upload_methods == "Telethon":
             #await edit.delete()
             progress_messagee = await gf.send_message(sender, "**__Downloading__...__**")
-            #print(f"progress_messagee ... {progress_messagee}")
+             
 
             
             # Fetch the message using the Telethon client
@@ -310,7 +310,7 @@ async def get_msg(userbot, telethonclient, sender, edit_id, msg_link, i, message
             except Exception as e:
                 await progress_messagee.edit(f"Error fetching message with Telethon: {e}")
                 await progress_messagee.delete(2)
-                print(f"Error fetching message with Telethon: ")
+                 
                 return # Exit the function on error
 
             file = await fast_download(
@@ -322,7 +322,7 @@ async def get_msg(userbot, telethonclient, sender, edit_id, msg_link, i, message
 
             await progress_messagee.delete()
         
-        print(f"fast_download complete ... ")
+         
         
         caption = await get_final_caption(msg, sender)
 
