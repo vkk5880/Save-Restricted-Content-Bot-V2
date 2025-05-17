@@ -190,6 +190,28 @@ async def upload_media(sender, target_chat_id, file, caption, edit, topic_id):
         gc.collect()
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 async def get_msg(userbot, telethonclient, sender, edit_id, msg_link, i, message):
     try:
         # Sanitize the message link
@@ -278,7 +300,7 @@ async def get_msg(userbot, telethonclient, sender, edit_id, msg_link, i, message
 
         
         upload_methods = await fetch_upload_method(sender)  # Fetch the upload method (Pyrogram or Telethon)
-        print(f"upload_method ... {upload_methods}")
+        #print(f"upload_method ... {upload_methods}")
 
         # Pyrogram Download
         if upload_methods == "Pyrogram":
@@ -357,7 +379,7 @@ async def get_msg(userbot, telethonclient, sender, edit_id, msg_link, i, message
         await app.edit_message_text(sender, edit_id, "Have you joined the channel?")
     except Exception as e:
         # await app.edit_message_text(sender, edit_id, f"Failed to save: `{msg_link}`\n\nError: {str(e)}")
-        print(f"Error: {e}")
+        #print(f"Error: {e}")
     finally:
         # Clean up
         if file and os.path.exists(file):
@@ -365,6 +387,13 @@ async def get_msg(userbot, telethonclient, sender, edit_id, msg_link, i, message
         if edit:
             await edit.delete(2)
         
+
+
+
+
+
+
+
 async def clone_message(app, msg, target_chat_id, topic_id, edit_id, log_group):
     edit = await app.edit_message_text(target_chat_id, edit_id, "Cloning...")
     devgaganin = await app.send_message(target_chat_id, msg.text.markdown, reply_to_message_id=topic_id)
