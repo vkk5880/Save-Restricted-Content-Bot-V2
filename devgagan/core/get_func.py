@@ -18,7 +18,6 @@ import time
 import gc
 import os
 import re
-from pyrogram.enums import ParseMode
 import logging
 from typing import Callable
 from telethon import TelegramClient, events, Button, types
