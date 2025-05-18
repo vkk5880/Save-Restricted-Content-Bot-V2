@@ -11,7 +11,8 @@ motor
 pytz
 flask
 aiohttp
-telethon
+#telethon
+telethon>=2.0.0
 aiojobs
 werkzeug==2.2.2
 apscheduler 
