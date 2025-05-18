@@ -12,7 +12,7 @@ pytz
 flask
 aiohttp
 #telethon
-telethon>=2.0.0
+telethon
 aiojobs
 werkzeug==2.2.2
 apscheduler 
