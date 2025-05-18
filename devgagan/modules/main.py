@@ -269,9 +269,9 @@ async def convert_user_string(pyrogram_string: str):
 
 async def initialize_telethon_userbot(user_id): # this ensure the single startup .. even if logged in or not
     """Initialize the userbot session for the given user."""
-    data = await db.get_data(user_id)
-    if data and data.get("telethon_session_string"):
-        telethon_string = data.get("telethon_session_string")
+    sessions = await db.get_sessions(user_id)
+    if sessions:
+        telethon_string = sessions["telethon_session"]
         try:
             device = 'iPhone 16 Pro' # added gareebi text
             telethon_userbot = TelegramClient(
