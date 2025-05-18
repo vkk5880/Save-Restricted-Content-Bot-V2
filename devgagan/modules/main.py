@@ -285,7 +285,7 @@ async def initialize_telethon_userbot(user_id): # this ensure the single startup
             print("telethon_userbot success")
             return telethon_userbot
         except Exception:
-            print(telethon_session_string none)
+            print("telethon_session_string none")
             return None
     return None
 
