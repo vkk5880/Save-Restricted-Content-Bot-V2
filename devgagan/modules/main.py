@@ -21,6 +21,7 @@ from pyrogram import filters, Client
 from devgagan import app
 from config import API_ID, API_HASH, FREEMIUM_LIMIT, PREMIUM_LIMIT, OWNER_ID
 from devgagan.core.get_func import get_msg
+from devgagan.core.get_func_telethon import get_msg_telethon
 from devgagan.core.func import *
 from devgagan.core.mongo import db
 from pyrogram.errors import FloodWait
@@ -31,7 +32,7 @@ import subprocess
 from telethon.sync import TelegramClient
 from session_converter import SessionManager
 from pyrogram.handlers import MessageHandler, CallbackQueryHandler
-
+from telethon.errors import FloodWaitError
 from devgagan.modules.shrink import is_user_verified
 '''
 from devgagan.modules.connect_user import (
@@ -75,18 +76,29 @@ async def fetch_upload_method(user_id):
 
     user_data = collection.find_one({"user_id": user_id})
     #print(f"fetch_upload_method ... {user_data.get('upload_method', 'Pyrogram')}")
-    return "Pyrogram"
-    #user_data.get("upload_method", "Pyrogram") if user_data else "Pyrogram"
+    return user_data.get("upload_method", "Pyrogram") if user_data else "Pyrogram"
 
 
 
-async def process_and_upload_link(userbot, telethonclient, user_id, msg_id, link, retry_count, message):
+async def process_and_upload_link(userbot, user_id, msg_id, link, retry_count, message):
     print("process_and_upload_link method.")
     try:
-        await get_msg(userbot, telethonclient,  user_id, msg_id, link, retry_count, message)
+        await get_msg(userbot, user_id, msg_id, link, retry_count, message)
         await asyncio.sleep(15)
     finally:
         pass
+
+
+async def process_and_upload_link_telethon(telethonclient, user_id, msg_id, link, retry_count, message):
+    print("process_and_upload_link method_telethon.")
+    try:
+        await get_msg_telethon(telethonclient, user_id, msg_id, link, retry_count, message)
+        await asyncio.sleep(15)
+    finally:
+        pass
+
+
+
 
 # Function to check if the user can proceed
 async def check_interval(user_id, freecheck):
@@ -147,24 +159,34 @@ async def single_link(_, message):
     link = message.text if "tg://openmessage" in message.text else get_link(message.text)
     msg = await message.reply("Processing...")
 
-    upload_methods = await fetch_upload_method(sender)  # Fetch the upload method (Pyrogram or Telethon)
-        print(f"upload_method ... {upload_methods}")
-    
-    userbot = await initialize_userbot(user_id)
-    telethonclient  = await initialize_telethon_userbot(user_id)
+    upload_methods = await fetch_upload_method(user_id)  # Fetch the upload method (Pyrogram or Telethon)
+    print(f"upload_method ... {upload_methods}")
+    telethon_userbot = None
+    userbot = None
+    if upload_methods == "Pyrogram":
+        userbot = await initialize_userbot(user_id)
+    elif upload_methods == "Telethon":
+        telethon_userbot  = await initialize_telethon_userbot(user_id)
     try:
         if await is_normal_tg_link(link):
             # Pass userbot if available; handle normal Telegram links
             print("process_and_upload_link.")
-            await process_and_upload_link(userbot, telethonclient, user_id, msg.id, link, 0, message)
+            if upload_methods == "Pyrogram":
+                await process_and_upload_link(userbot, user_id, msg.id, link, 0, message)
+            elif upload_methods == "Telethon":
+                await process_and_upload_link(telethon_userbot, user_id, msg.id, link, 0, message)
             await set_interval(user_id, interval_minutes=45)
             print("process_and_upload_link was completed.")
         else:
             # Handle special Telegram links
-            await process_special_links(userbot, telethonclient, user_id, msg, link)
+            if upload_methods == "Pyrogram":
+                await process_special_links(userbot, user_id, msg, link)
+            elif upload_methods == "Telethon":
+                await process_special_links_telethon(telethon_userbot, user_id, msg, link)
             
-    except FloodWait as fw:
-        await msg.edit_text(f'Try again after {fw.x} seconds due to floodwait from Telegram.')
+    except (FloodWaitError, FloodWait) as fw:
+    seconds = fw.seconds if hasattr(fw, 'seconds') else fw.value
+    await msg.edit_text(f'Try again in {seconds} seconds due to floodwait from Telegram.')
     except Exception as e:
         await msg.edit_text(f"Link: `{link}`\n\n**Error:** {str(e)}")
     finally:
@@ -252,16 +274,28 @@ async def is_normal_tg_link(link: str) -> bool:
     special_identifiers = ['t.me/+', 't.me/c/', 't.me/b/', 'tg://openmessage']
     return 't.me/' in link and not any(x in link for x in special_identifiers)
     
-async def process_special_links(userbot, telethonclient, user_id, msg, link):
+async def process_special_links(userbot, user_id, msg, link):
     """Handle special Telegram links."""
     if 't.me/+' in link:
         result = await userbot_join(userbot, link)
         await msg.edit_text(result)
     elif any(sub in link for sub in ['t.me/c/', 't.me/b/', '/s/', 'tg://openmessage']):
-        await process_and_upload_link(userbot, telethonclient, user_id, msg.id, link, 0, msg)
+        await process_and_upload_link(userbot, user_id, msg.id, link, 0, msg)
         await set_interval(user_id, interval_minutes=45)
     else:
         await msg.edit_text("Invalid link format.")
+
+async def process_special_links_telethon(telethon_userbot, user_id, msg, link):
+    """Handle special Telegram links using Telethon."""
+    if 't.me/+' in link:
+        result = await telethon_userbot_join(telethon_userbot, link)
+        await msg.edit_text(result)
+    elif any(sub in link for sub in ['t.me/c/', 't.me/b/', '/s/', 'tg://openmessage']):
+        await process_and_upload_link_telethon(telethon_userbot, telethonclient, user_id, msg.id, link, 0, msg)
+        await set_interval(user_id, interval_minutes=45)
+    else:
+        await msg.edit_text("Invalid link format.")
+
 
 
 @app.on_message(filters.command("batch") & filters.private)
