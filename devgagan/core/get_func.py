@@ -37,12 +37,7 @@ from devgagantools import fast_upload
 from session_converter import SessionManager
 from devgagan.core.func import *
 from devgagan.modules.shrink import is_user_verified
-from upload_methods import (
-    pyrogram_download,
-    telethon_download,
-    pyrogram_upload,
-    telethon_upload
-)
+
 
 def thumbnail(sender):
     return f'{sender}.jpg' if os.path.exists(f'{sender}.jpg') else None
