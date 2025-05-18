@@ -1,5 +1,5 @@
 # ---------------------------------------------------
-# File Name: db.py
+# File Name: db.py tel_db = db.users_data_tel_db  # Setting the database
 # Description: MongoDB operations for Pyrogram bot
 # Author: Gagan
 # GitHub: https://github.com/devgaganin/
@@ -51,12 +51,74 @@ async def replace_caption(user_id, replace_txt, to_replace):
         await db.insert_one({"_id": user_id, "replace_txt": replace_txt, "to_replace": to_replace})
 
 # Function to set user session
+# Function to set Pyrogram session
 async def set_session(user_id, session):
-    data = await get_data(user_id)
+    """Set Pyrogram session string in database"""
+    await db.update_one(
+        {"_id": user_id},
+        {"$set": {"session": session}},
+        upsert=True
+    )
+
+# Function to set Telethon session
+async def set_telethon_session(user_id, telethon_session_string):
+    """Set Telethon session string in database"""
+    await db.update_one(
+        {"_id": user_id},
+        {"$set": {"telethon_session_string": telethon_session_string}},
+        upsert=True
+    )
+
+# Function to get both sessions
+async def get_sessions(user_id):
+    """Get both Pyrogram and Telethon sessions"""
+    data = await db.find_one({"_id": user_id})
     if data:
-        await db.update_one({"_id": user_id}, {"$set": {"session": session}})
-    else:
-        await db.insert_one({"_id": user_id, "session": session})
+        return {
+            "pyro_session": data.get("session"),
+            "telethon_session": data.get("telethon_session_string")
+        }
+    return None
+
+# Function to check if Pyrogram session exists
+async def has_pyro_session(user_id):
+    """Check if user has Pyrogram session"""
+    data = await db.find_one({"_id": user_id})
+    return bool(data and data.get("session"))
+
+# Function to check if Telethon session exists
+async def has_telethon_session(user_id):
+    """Check if user has Telethon session"""
+    data = await db.find_one({"_id": user_id})
+    return bool(data and data.get("telethon_session_string"))
+
+# Function to remove Pyrogram session
+async def remove_pyro_session(user_id):
+    """Remove Pyrogram session"""
+    await db.update_one(
+        {"_id": user_id},
+        {"$unset": {"session": ""}}
+    )
+
+# Function to remove Telethon session
+async def remove_telethon_session(user_id):
+    """Remove Telethon session"""
+    await db.update_one(
+        {"_id": user_id},
+        {"$unset": {"telethon_session_string": ""}}
+    )
+
+# Function to remove both sessions
+async def remove_all_sessions(user_id):
+    """Remove both Pyrogram and Telethon sessions"""
+    await db.update_one(
+        {"_id": user_id},
+        {"$unset": {
+            "session": "",
+            "telethon_session_string": ""
+        }}
+    )
+
 
 # Function to add new clean words to user data
 async def clean_words(user_id, new_clean_words):
