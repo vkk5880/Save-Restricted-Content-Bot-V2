@@ -176,6 +176,7 @@ async def single_link(_, message):
         userbot = await initialize_userbot(user_id)
     elif upload_methods == "Telethon":
         telethon_userbot  = await initialize_telethon_userbot(user_id)
+        await asyncio.sleep(15)
     try:
         if await is_normal_tg_link(link):
             # Pass userbot if available; handle normal Telegram links
@@ -183,14 +184,23 @@ async def single_link(_, message):
             if upload_methods == "Pyrogram":
                 await process_and_upload_link(userbot, user_id, msg.id, link, 0, message)
             elif upload_methods == "Telethon":
+                if telethon_userbot is None:
+                    print("telethon_userbot is Non.")
+                    await message.reply("telethon_userbot is Non.")
+                    return
                 await process_and_upload_link_telethon(telethon_userbot, user_id, msg.id, link, 0, message)
             await set_interval(user_id, interval_minutes=45)
             print("process_and_upload_link was completed.")
         else:
             # Handle special Telegram links
+            print("process_and_upload_special_link.")
             if upload_methods == "Pyrogram":
                 await process_special_links(userbot, user_id, msg, link)
             elif upload_methods == "Telethon":
+                if telethon_userbot is None:
+                    print("telethon_userbot is Non.")
+                    await message.reply("telethon_userbot is Non.")
+                    return
                 await process_special_links_telethon(telethon_userbot, user_id, msg, link)
             
     except (FloodWaitError, FloodWait) as fw:
