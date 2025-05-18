@@ -187,6 +187,8 @@ async def single_link(_, message):
     except (FloodWaitError, FloodWait) as fw:
     seconds = fw.seconds if hasattr(fw, 'seconds') else fw.value
     await msg.edit_text(f'Try again in {seconds} seconds due to floodwait from Telegram.')
+    await asyncio.sleep(seconds)
+    continue
     except Exception as e:
         await msg.edit_text(f"Link: `{link}`\n\n**Error:** {str(e)}")
     finally:
