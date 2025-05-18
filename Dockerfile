@@ -1,8 +1,9 @@
 FROM python:3.10.4-slim-buster
-RUN yum update && yum upgrade -y
-RUN yum-get install git curl python3-pip ffmpeg -y
-RUN yum-get -y install git
-RUN yum-get install -y wget python3-pip curl bash neofetch ffmpeg software-properties-common
+RUN apt update && apt upgrade -y
+RUN apt-get install git curl python3-pip ffmpeg -y
+RUN apt-get -y install git
+RUN apt-get install -y wget python3-pip curl bash neofetch ffmpeg software-properties-common
+RUN python3 -m pip install --upgrade pip
 COPY requirements.txt .
 
 RUN pip3 install wheel
