@@ -28,7 +28,7 @@ from telethon.errors import (
     ChatInvalidError,
     FloodWaitError
 )
-from telethon.tl.functions.stories import GetStoriesRequest
+from telethon import functions, types
 from telethon.tl.types import DocumentAttributeVideo, Message
 from telethon.sessions import StringSession
 import pymongo
@@ -348,9 +348,20 @@ async def get_final_caption_telethon(msg, sender):
     return final_caption if final_caption else None
 
 async def download_user_stories_telethon(telethon_userbot, chat_id, msg_id, edit, sender):
-    """Download user stories using Telethon"""
+    """Download user stories using Telethon (1.40.0+ compatible)"""
     try:
-        stories = await telethon_userbot(GetStoriesRequest(peer=chat_id, id=[msg_id]))
+        # Try modern approach first (Telethon 2.x)
+        try:
+            from telethon.tl.functions.stories import GetStoriesRequest
+            stories = await telethon_userbot(GetStoriesRequest(peer=chat_id, id=[msg_id]))
+        except (ImportError, AttributeError):
+            # Fallback to legacy method (Telethon 1.x)
+            story = await telethon_userbot.get_messages(chat_id, ids=msg_id)
+            if not story or not story.media:
+                await edit.edit("No story available or no media found")
+                return
+            stories = type('Stories', (), {'stories': [story]})()  # Create dummy stories object
+
         if not stories or not stories.stories:
             await edit.edit("No story available for this user.")
             return
@@ -360,22 +371,48 @@ async def download_user_stories_telethon(telethon_userbot, chat_id, msg_id, edit
             await edit.edit("The story doesn't contain any media.")
             return
             
-        await edit.edit("Downloading Story...")
-        file_path = await telethon_userbot.download_media(story.media)
-        logger.info(f"Story downloaded: {file_path}")
+        await edit.edit("⬇️ Downloading Story...")
+        file_path = await telethon_userbot.download_media(
+            story.media,
+            progress_callback=lambda d, t: asyncio.create_task(
+                edit.edit(f"⬇️ Downloading... {d * 100 / t:.1f}%")
+            ) if d and t else None
+        )
         
-        await edit.edit("Uploading Story...")
-        if isinstance(story.media, types.MessageMediaPhoto):
-            await app.send_photo(sender, file_path)
-        elif isinstance(story.media, types.MessageMediaDocument):
-            await app.send_document(sender, file_path)
+        if not file_path or not os.path.exists(file_path):
+            raise Exception("Download failed or file not found")
             
-        if file_path and os.path.exists(file_path):
-            os.remove(file_path)  
-        await edit.edit("Story processed successfully.")
+        logger.info(f"Story downloaded: {file_path}")
+
+        await edit.edit("⬆️ Uploading Story...")
+        if isinstance(story.media, types.MessageMediaPhoto):
+            await app.send_photo(
+                sender,
+                file_path,
+                progress=progress_bar,
+                progress_args=("Uploading story photo...", edit)
+            )
+        elif isinstance(story.media, types.MessageMediaDocument):
+            await app.send_document(
+                sender,
+                file_path,
+                progress=progress_bar,
+                progress_args=("Uploading story document...", edit)
+            )
+            
+        await edit.edit("✅ Story processed successfully")
+        
+    except FloodWaitError as fw:
+        await edit.edit(f"⏳ FloodWait: Please wait {fw.seconds} seconds")
+        await asyncio.sleep(fw.seconds)
+        # Optionally add retry logic here
     except Exception as e:
-        logger.error(f"Failed to fetch story: {e}")
-        await edit.edit(f"Error: {e}")
+        logger.error(f"Story processing failed: {str(e)}", exc_info=True)
+        await edit.edit(f"❌ Error: {str(e)}")
+    finally:
+        if 'file_path' in locals() and file_path and os.path.exists(file_path):
+            os.remove(file_path)
+
 
 async def copy_message_with_chat_id_telethon(app, telethon_userbot, sender, chat_id, message_id, edit):
     """Copy message with chat ID handling"""
