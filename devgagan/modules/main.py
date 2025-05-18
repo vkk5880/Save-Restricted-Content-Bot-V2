@@ -67,7 +67,7 @@ connect_app.run()
 
 '''
 
-async def fetch_upload_method(user_id):
+async def fetch_upload_method(message, user_id):
     """Fetch the user's preferred upload method."""
     freecheck = await chk_user(message, user_id)
     if freecheck == 1 and user_id not in OWNER_ID and not await is_user_verified(user_id):
@@ -159,7 +159,7 @@ async def single_link(_, message):
     link = message.text if "tg://openmessage" in message.text else get_link(message.text)
     msg = await message.reply("Processing...")
 
-    upload_methods = await fetch_upload_method(user_id)  # Fetch the upload method (Pyrogram or Telethon)
+    upload_methods = await fetch_upload_method(message, user_id)  # Fetch the upload method (Pyrogram or Telethon)
     print(f"upload_method ... {upload_methods}")
     telethon_userbot = None
     userbot = None
@@ -372,7 +372,7 @@ async def batch_link(_, message):
     userbot = None
     
     try:
-        upload_methods = await fetch_upload_method(user_id)
+        upload_methods = await fetch_upload_method(message, user_id)
         print(f"upload_method ... {upload_methods}")
         
         # Initialize the appropriate client
