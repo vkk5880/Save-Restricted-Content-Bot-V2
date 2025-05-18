@@ -185,10 +185,10 @@ async def single_link(_, message):
                 await process_special_links_telethon(telethon_userbot, user_id, msg, link)
             
     except (FloodWaitError, FloodWait) as fw:
-    seconds = fw.seconds if hasattr(fw, 'seconds') else fw.value
-    await msg.edit_text(f'Try again in {seconds} seconds due to floodwait from Telegram.')
-    await asyncio.sleep(seconds)
-    continue
+        seconds = fw.seconds if hasattr(fw, 'seconds') else fw.value
+        await msg.edit_text(f'Try again in {seconds} seconds due to floodwait from Telegram.')
+        await asyncio.sleep(seconds)
+        continue
     except Exception as e:
         await msg.edit_text(f"Link: `{link}`\n\n**Error:** {str(e)}")
     finally:
