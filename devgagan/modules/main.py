@@ -89,10 +89,10 @@ async def process_and_upload_link(userbot, user_id, msg_id, link, retry_count, m
         pass
 
 
-async def process_and_upload_link_telethon(telethonclient, user_id, msg_id, link, retry_count, message):
+async def process_and_upload_link_telethon(telethon_userbot, user_id, msg_id, link, retry_count, message):
     print("process_and_upload_link method_telethon.")
     try:
-        await get_msg_telethon(telethonclient, user_id, msg_id, link, retry_count, message)
+        await get_msg_telethon(telethon_userbot, user_id, msg_id, link, retry_count, message)
         await asyncio.sleep(15)
     finally:
         pass
@@ -174,7 +174,7 @@ async def single_link(_, message):
             if upload_methods == "Pyrogram":
                 await process_and_upload_link(userbot, user_id, msg.id, link, 0, message)
             elif upload_methods == "Telethon":
-                await process_and_upload_link(telethon_userbot, user_id, msg.id, link, 0, message)
+                await process_and_upload_link_telethon(telethon_userbot, user_id, msg.id, link, 0, message)
             await set_interval(user_id, interval_minutes=45)
             print("process_and_upload_link was completed.")
         else:
@@ -193,6 +193,8 @@ async def single_link(_, message):
         users_loop[user_id] = False
         if userbot:
             await userbot.stop()
+        if telethon_userbot:
+            await telethon_userbot.disconnect()
         try:
             await msg.delete()
         except Exception:
@@ -291,7 +293,7 @@ async def process_special_links_telethon(telethon_userbot, user_id, msg, link):
         result = await telethon_userbot_join(telethon_userbot, link)
         await msg.edit_text(result)
     elif any(sub in link for sub in ['t.me/c/', 't.me/b/', '/s/', 'tg://openmessage']):
-        await process_and_upload_link_telethon(telethon_userbot, telethonclient, user_id, msg.id, link, 0, msg)
+        await process_and_upload_link_telethon(telethon_userbot, user_id, msg.id, link, 0, msg)
         await set_interval(user_id, interval_minutes=45)
     else:
         await msg.edit_text("Invalid link format.")
@@ -304,6 +306,7 @@ async def batch_link(_, message):
     if join == 1:
         return
     user_id = message.chat.id
+    
     # Check if a batch process is already running
     if users_loop.get(user_id, False):
         await app.send_message(
@@ -365,51 +368,71 @@ async def batch_link(_, message):
     await pin_msg.pin(both_sides=True)
 
     users_loop[user_id] = True
+    telethon_userbot = None
+    userbot = None
+    
     try:
+        upload_methods = await fetch_upload_method(user_id)
+        print(f"upload_method ... {upload_methods}")
+        
+        # Initialize the appropriate client
+        if upload_methods == "Pyrogram":
+            userbot = await initialize_userbot(user_id)
+        elif upload_methods == "Telethon":
+            telethon_userbot = await initialize_telethon_userbot(user_id)
+        
         normal_links_handled = False
-        userbot = await initialize_userbot(user_id)
-        telethonclient  = await initialize_telethon_userbot(user_id)
-        # Handle normal links first
+        
+        # Process all links
         for i in range(cs, cs + cl):
-            if user_id in users_loop and users_loop[user_id]:
-                url = f"{'/'.join(start_id.split('/')[:-1])}/{i}"
-                link = get_link(url)
-                # Process t.me links (normal) without userbot
+            if not users_loop.get(user_id, False):
+                break
+                
+            url = f"{'/'.join(start_id.split('/')[:-1])}/{i}"
+            link = get_link(url)
+            msg = await app.send_message(message.chat.id, f"Processing...")
+            
+            try:
+                # Handle normal public links
                 if 't.me/' in link and not any(x in link for x in ['t.me/b/', 't.me/c/', 'tg://openmessage']):
-                    msg = await app.send_message(message.chat.id, f"Processing...")
-                    await process_and_upload_link(userbot, telethonclient, user_id, msg.id, link, 0, message)
-                    await pin_msg.edit_text(
-                        f"Batch process started ⚡\nProcessing: {i - cs + 1}/{cl}\n\n****",
-                        reply_markup=keyboard
-                    )
+                    if upload_methods == "Pyrogram":
+                        await process_and_upload_link(userbot, user_id, msg.id, link, i-cs, message)
+                    elif upload_methods == "Telethon":
+                        await process_and_upload_link_telethon(telethon_userbot, user_id, msg.id, link, i-cs, message)
                     normal_links_handled = True
+                
+                # Handle special links
+                elif any(x in link for x in ['t.me/b/', 't.me/c/', 'tg://openmessage']):
+                    if upload_methods == "Pyrogram" and userbot:
+                        await process_special_links(userbot, user_id, msg, link)
+                    elif upload_methods == "Telethon" and telethon_userbot:
+                        await process_special_links_telethon(telethon_userbot, user_id, msg, link)
+                    else:
+                        await app.send_message(message.chat.id, "Login in bot first ...")
+                        break
+                
+                await pin_msg.edit_text(
+                    f"Batch process started ⚡\nProcessing: {i - cs + 1}/{cl}\n\n****",
+                    reply_markup=keyboard
+                )
+                
+            except (FloodWaitError, FloodWait) as fw:
+                seconds = fw.seconds if hasattr(fw, 'seconds') else fw.value
+                await msg.edit_text(f'FloodWait: Try again in {seconds} seconds')
+                await asyncio.sleep(seconds)
+                continue
+            except Exception as e:
+                await msg.edit_text(f"Error processing {link}: {str(e)}")
+                continue
+            finally:
+                try:
+                    await msg.delete()
+                except:
+                    pass
+
         if normal_links_handled:
             await set_interval(user_id, interval_minutes=300)
-            await pin_msg.edit_text(
-                f"Batch completed successfully for {cl} messages 🎉\n\n****",
-                reply_markup=keyboard
-            )
-            await app.send_message(message.chat.id, "Batch completed successfully! 🎉")
-            return
-            
-        # Handle special links with userbot
-        for i in range(cs, cs + cl):
-            if not userbot:
-                await app.send_message(message.chat.id, "Login in bot first ...")
-                users_loop[user_id] = False
-                return
-            if user_id in users_loop and users_loop[user_id]:
-                url = f"{'/'.join(start_id.split('/')[:-1])}/{i}"
-                link = get_link(url)
-                if any(x in link for x in ['t.me/b/', 't.me/c/']):
-                    msg = await app.send_message(message.chat.id, f"Processing...")
-                    await process_and_upload_link(userbot, telethonclient, user_id, msg.id, link, 0, message)
-                    await pin_msg.edit_text(
-                        f"Batch process started ⚡\nProcessing: {i - cs + 1}/{cl}\n\n****",
-                        reply_markup=keyboard
-                    )
-
-        await set_interval(user_id, interval_minutes=300)
+        
         await pin_msg.edit_text(
             f"Batch completed successfully for {cl} messages 🎉\n\n****",
             reply_markup=keyboard
@@ -417,9 +440,17 @@ async def batch_link(_, message):
         await app.send_message(message.chat.id, "Batch completed successfully! 🎉")
 
     except Exception as e:
-        await app.send_message(message.chat.id, f"Error: {e}")
+        await app.send_message(message.chat.id, f"Batch processing failed: {e}")
     finally:
         users_loop.pop(user_id, None)
+        if userbot:
+            await userbot.stop()
+        if telethon_userbot:
+            await telethon_userbot.disconnect()
+        
+
+
+
 
 @app.on_message(filters.command("cancel"))
 async def stop_batch(_, message):
