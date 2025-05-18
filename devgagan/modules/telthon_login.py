@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 async def check_pyrogram_login(user_id):
     """Check if user has Pyrogram login"""
     user_data = await db.user_sessions_real.find_one({"user_id": user_id})
-    return bool(user_data and user_data.get("pyro_session_string"))
+    return bool(user_data and user_data.get("session_string"))
 
 async def save_telethon_session(user_id, session_string, phone_number):
     """Save Telethon session to database"""
@@ -142,7 +142,7 @@ async def logout_all_handler(client, message):
     await db.user_sessions_real.update_one(
         {"user_id": user_id},
         {"$set": {
-            "pyro_session_string": None,
+            "session_string": None,
             "telethon_session_string": None
         }}
     )
