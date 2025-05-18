@@ -34,6 +34,7 @@ from session_converter import SessionManager
 from pyrogram.handlers import MessageHandler, CallbackQueryHandler
 from telethon.errors import FloodWaitError
 from devgagan.modules.shrink import is_user_verified
+from config import MONGO_DB as MONGODB_CONNECTION_STRING, LOG_GROUP, OWNER_ID, STRING, API_ID, CONTACT, API_HASH
 '''
 from devgagan.modules.connect_user import (
     connect_user, 
@@ -66,6 +67,13 @@ register_handlers(connect_app)
 connect_app.run()
 
 '''
+# MongoDB database name and collection name
+DB_NAME = "smart_users"
+COLLECTION_NAME = "super_user"
+
+mongo_app = pymongo.MongoClient(MONGODB_CONNECTION_STRING)
+db = mongo_app[DB_NAME]
+collection = db[COLLECTION_NAME]
 
 async def fetch_upload_method(message, user_id):
     """Fetch the user's preferred upload method."""
