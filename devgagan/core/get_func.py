@@ -37,7 +37,12 @@ from devgagantools import fast_upload
 from session_converter import SessionManager
 from devgagan.core.func import *
 from devgagan.modules.shrink import is_user_verified
-
+from upload_methods import (
+    pyrogram_download,
+    telethon_download,
+    pyrogram_upload,
+    telethon_upload
+)
 
 def thumbnail(sender):
     return f'{sender}.jpg' if os.path.exists(f'{sender}.jpg') else None
@@ -60,37 +65,145 @@ else:
     pro = None
     print("STRING is not available. 'app' is set to None.")
     
-async def fetch_upload_method(user_id):
-    """Fetch the user's preferred upload method."""
-    freecheck = await chk_user(message, user_id)
-    if freecheck == 1 and user_id not in OWNER_ID and not await is_user_verified(user_id):
-        print("Always Pyrogram for non-pro ...")
-        return "Pyrogram" # Always Pyrogram for non-pro
+ 
 
-    user_data = collection.find_one({"user_id": user_id})
-    #print(f"fetch_upload_method ... {user_data.get('upload_method', 'Pyrogram')}")
-    return "Pyrogram"
-    #user_data.get("upload_method", "Pyrogram") if user_data else "Pyrogram"
-
-
-async def format_caption_to_html(caption: str) -> str:
-    caption = re.sub(r"^> (.*)", r"<blockquote>\1</blockquote>", caption, flags=re.MULTILINE)
-    caption = re.sub(r"```(.*?)```", r"<pre>\1</pre>", caption, flags=re.DOTALL)
-    caption = re.sub(r"`(.*?)`", r"<code>\1</code>", caption)
-    caption = re.sub(r"\*\*(.*?)\*\*", r"<b>\1</b>", caption)
-    caption = re.sub(r"\*(.*?)\*", r"<b>\1</b>", caption)
-    caption = re.sub(r"__(.*?)__", r"<i>\1</i>", caption)
-    caption = re.sub(r"_(.*?)_", r"<i>\1</i>", caption)
-    caption = re.sub(r"~~(.*?)~~", r"<s>\1</s>", caption)
-    caption = re.sub(r"\|\|(.*?)\|\|", r"<details>\1</details>", caption)
-    caption = re.sub(r"\[(.*?)\]\((.*?)\)", r'<a href="\2">\1</a>', caption)
-    return caption.strip() if caption else None
-    
-
-
-async def upload_media(sender, target_chat_id, file, caption, edit, topic_id):
+async def get_msg_telethon(telethon_userbot, telethonclient, sender, edit_id, msg_link, i, message):
     try:
-        upload_method = await fetch_upload_method(sender)  # Fetch the upload method (Pyrogram or Telethon)
+        # Sanitize the message link
+        msg_link = msg_link.split("?single")[0]
+        chat, msg_id = None, None
+        saved_channel_ids = load_saved_channel_ids()
+        size_limit = 2 * 1024 * 1024 * 1024  # 1.99 GB size limit
+        file = ''
+        edit = ''
+        # Extract chat and message ID for valid Telegram links
+        if 't.me/c/' in msg_link or 't.me/b/' in msg_link:
+            parts = msg_link.split("/")
+            if 't.me/b/' in msg_link:
+                chat = parts[-2]
+                msg_id = int(parts[-1]) + i # fixed bot problem
+            else:
+                chat = int('-100' + parts[parts.index('c') + 1])
+                msg_id = int(parts[-1]) + i
+
+            if chat in saved_channel_ids:
+                await app.edit_message_text(
+                    message.chat.id, edit_id,
+                    "Sorry! This channel is protected by **Admin**."
+                )
+                return
+
+        elif '/s/' in msg_link: # fixed story typo
+            edit = await app.edit_message_text(sender, edit_id, "Story Link Detected...")
+            if telethon_userbot is None:
+                await edit.edit("Login in bot save stories...")
+                return
+            parts = msg_link.split("/")
+            chat = parts[3]
+
+            if chat.isdigit():    # this is for channel stories
+                chat = f"-100{chat}"
+
+            msg_id = int(parts[-1])
+            await download_user_stories_telethon(telethon_userbot, chat, msg_id, edit, sender)
+            await edit.delete()
+            return
+
+        else:
+            edit = await app.edit_message_text(sender, edit_id, "Public link detected...")
+            chat = msg_link.split("t.me/")[1].split("/")[0]
+            msg_id = int(msg_link.split("/")[-1])
+            await copy_message_with_chat_id_telethon(app, telethon_userbot, sender, chat, msg_id, edit)
+            await edit.delete()
+            return
+
+        # Fetch the target message
+        msg = await telethon_userbot.get_messages(chat, ids=msg_id)
+        if not msg or isinstance(msg, types.MessageService) or not hasattr(msg, 'message'):
+            return
+
+        target_chat_id = user_chat_ids.get(message.chat.id, message.chat.id)
+        topic_id = None
+        if '/' in str(target_chat_id):
+            target_chat_id, topic_id = map(int, target_chat_id.split('/', 1))
+
+        # Handle different message types
+        if isinstance(msg.media, types.MessageMediaWebPage):
+            await clone_message_telethon(app, msg, target_chat_id, topic_id, edit_id, LOG_GROUP)
+            return
+
+        if msg.text:
+            await clone_text_message_telethon(app, msg, target_chat_id, topic_id, edit_id, LOG_GROUP)
+            return
+
+        if msg.sticker:
+            await handle_sticker_telethon(app, msg, target_chat_id, topic_id, edit_id, LOG_GROUP)
+            return
+
+        # Handle file media (photo, document, video)
+        file_size = get_message_file_size_telethon(msg)
+
+        if file_size and file_size > size_limit and pro is None:
+            await app.edit_message_text(sender, edit_id, "**❌ 4GB Uploader not found**")
+            return
+
+        file_name = await get_media_filename_telethon(msg)
+        edit = await app.edit_message_text(sender, edit_id, "**Downloading...**")
+        progress_message = await app.send_message(sender, "**__Downloading__...__**")
+        try:
+                print("fast_download start")
+                file = await fast_download(
+                    telethon_userbot, msg,
+                    reply=progress_message,
+                    progress_bar_function=lambda done, total: progress_callback(done, total, sender)
+                )
+                await progress_message.delete()
+        except Exception as e:
+                await progress_message.edit(f"Error downloading with Telethon: {e}")
+                await progress_message.delete()
+                return
+            
+        caption = await get_final_caption_telethon(msg, sender)
+
+        # Rename file
+        file = await rename_file(file, sender)
+        if isinstance(msg.media, types.MessageMediaAudio):
+            if msg.media.audio.voice:
+                result = await app.send_voice(target_chat_id, file, reply_to_message_id=topic_id)
+            else:
+                result = await app.send_audio(target_chat_id, file, caption=caption, reply_to_message_id=topic_id)
+            await result.copy(LOG_GROUP)
+            await edit.delete()
+            return
+
+        if isinstance(msg.media, types.MessageMediaPhoto):
+            result = await app.send_photo(target_chat_id, file, caption=caption, reply_to_message_id=topic_id)
+            await result.copy(LOG_GROUP)
+            await edit.delete()
+            return
+
+        # Upload media
+        if file_size > size_limit:
+            await handle_large_file(file, sender, edit, caption)
+        else:
+            await upload_media_telethon(sender, target_chat_id, file, caption, edit, topic_id)
+
+    except (ChannelInvalidError, ChannelPrivateError, ChatIdInvalidError, ChatInvalidError):
+        await app.edit_message_text(sender, edit_id, "Have you joined the channel?")
+    except Exception as e:
+        pass
+    finally:
+        # Clean up
+        if file and os.path.exists(file):
+            os.remove(file)
+        if edit:
+            await edit.delete()
+
+
+
+async def upload_media_telethon(sender, target_chat_id, file, caption, edit, topic_id):
+    try:
+        # Get file metadata
         metadata = video_metadata(file)
         width, height, duration = metadata['width'], metadata['height'], metadata['duration']
         thumb_path = await screenshot(file, duration, sender)
@@ -99,9 +212,281 @@ async def upload_media(sender, target_chat_id, file, caption, edit, topic_id):
         document_formats = {'pdf', 'docx', 'txt', 'epub'}
         image_formats = {'jpg', 'png', 'jpeg'}
 
-        # Pyrogram upload
-        if upload_method == "Pyrogram":
-            if file.split('.')[-1].lower() in video_formats:
+        # Delete the edit message since we'll use our own progress
+        await edit.delete()
+        progress_message = await gf.send_message(sender, "**__Uploading...__**")
+
+        # Upload with floodwait handling
+        try:
+            uploaded = await fast_upload(
+                gf, file,
+                reply=progress_message,
+                name=None,
+                progress_bar_function=lambda done, total: progress_callback(done, total, sender)
+            )
+        except FloodWaitError as fw:
+            await progress_message.edit(f"⏳ FloodWait: Sleeping for {fw.seconds} seconds...")
+            await asyncio.sleep(fw.seconds)
+            # Retry after floodwait
+            uploaded = await fast_upload(
+                gf, file,
+                reply=progress_message,
+                name=None,
+                progress_bar_function=lambda done, total: progress_callback(done, total, sender)
+            )
+
+        await progress_message.delete()
+
+        # Prepare attributes based on file type
+        attributes = []
+        if file.split('.')[-1].lower() in video_formats:
+            attributes.append(DocumentAttributeVideo(
+                duration=duration,
+                w=width,
+                h=height,
+                supports_streaming=True
+            ))
+
+        # Send to target chat
+        await gf.send_file(
+            target_chat_id,
+            uploaded,
+            caption=caption,
+            attributes=attributes,
+            reply_to=topic_id,
+            thumb=thumb_path
+        )
+
+        # Send to log group
+        await gf.send_file(
+            LOG_GROUP,
+            uploaded,
+            caption=caption,
+            attributes=attributes,
+            thumb=thumb_path
+        )
+
+    except Exception as e:
+        await gf.send_message(LOG_GROUP, f"**Upload Failed:** {str(e)}")
+        print(f"Error during media upload: {e}")
+        raise  # Re-raise the exception for higher level handling
+
+    finally:
+        # Cleanup
+        if thumb_path and os.path.exists(thumb_path):
+            os.remove(thumb_path)
+        if 'progress_message' in locals():
+            try:
+                await progress_message.delete()
+            except:
+                pass
+        gc.collect()
+
+
+async def clone_message_telethon(app, msg, target_chat_id, topic_id, edit_id, log_group):
+    edit = await app.edit_message_text(target_chat_id, edit_id, "Cloning...")
+    devgaganin = await app.send_message(target_chat_id, msg.text, reply_to_message_id=topic_id)
+    await devgaganin.copy(log_group)
+    await edit.delete()
+
+async def clone_text_message_telethon(app, msg, target_chat_id, topic_id, edit_id, log_group):
+    edit = await app.edit_message_text(target_chat_id, edit_id, "Cloning text message...")
+    devgaganin = await app.send_message(target_chat_id, msg.text, reply_to_message_id=topic_id)
+    await devgaganin.copy(log_group)
+    await edit.delete()
+
+
+async def handle_sticker_telethon(app, msg, target_chat_id, topic_id, edit_id, log_group):
+    edit = await app.edit_message_text(target_chat_id, edit_id, "Handling sticker...")
+    result = await app.send_sticker(target_chat_id, msg.sticker.id, reply_to_message_id=topic_id)
+    await result.copy(log_group)
+    await edit.delete()
+
+
+async def get_media_filename_telethon(msg):
+    if isinstance(msg.media, types.MessageMediaDocument):
+        for attr in msg.media.document.attributes:
+            if isinstance(attr, types.DocumentAttributeFilename):
+                return attr.file_name
+        return "document"
+    if isinstance(msg.media, types.MessageMediaPhoto):
+        return "photo.jpg"
+    return "unknown_file"
+
+def get_message_file_size_telethon(msg):
+    if isinstance(msg.media, types.MessageMediaDocument):
+        return msg.media.document.size
+    if isinstance(msg.media, types.MessageMediaPhoto):
+        return None  # Photos don't have size in Telethon
+    return 1
+
+async def get_final_caption_telethon(msg, sender):
+    # Handle caption based on the upload method
+    if msg.message:
+        original_caption = msg.message
+    else:
+        original_caption = ""
+    
+    custom_caption = get_user_caption_preference(sender)
+    final_caption = f"{original_caption}\n\n{custom_caption}" if custom_caption else original_caption
+    replacements = load_replacement_words(sender)
+    for word, replace_word in replacements.items():
+        final_caption = final_caption.replace(word, replace_word)
+        
+    return final_caption if final_caption else None
+
+
+async def download_user_stories_telethon(telethon_userbot, chat_id, msg_id, edit, sender):
+    try:
+        # Fetch the story using the provided chat ID and message ID
+        stories = await telethon_userbot(GetStoriesRequest(peer=chat_id, id=[msg_id]))
+        if not stories or not stories.stories:
+            await edit.edit("No story available for this user.")
+            return
+            
+        story = stories.stories[0]
+        if not story.media:
+            await edit.edit("The story doesn't contain any media.")
+            return
+            
+        await edit.edit("Downloading Story...")
+        file_path = await telethon_userbot.download_media(story.media)
+        print(f"Story downloaded: {file_path}")
+        
+        # Send the downloaded story based on its type
+        await edit.edit("Uploading Story...")
+        if isinstance(story.media, types.MessageMediaPhoto):
+            await app.send_photo(sender, file_path)
+        elif isinstance(story.media, types.MessageMediaDocument):
+            await app.send_document(sender, file_path)
+            
+        if file_path and os.path.exists(file_path):
+            os.remove(file_path)  
+        await edit.edit("Story processed successfully.")
+    except Exception as e:
+        print(f"Failed to fetch story: {e}")
+        await edit.edit(f"Error: {e}")
+        
+async def copy_message_with_chat_id_telethon(app, telethon_userbot, sender, chat_id, message_id, edit):
+    target_chat_id = user_chat_ids.get(sender, sender)
+    file = None
+    result = None
+    size_limit = 2 * 1024 * 1024 * 1024  # 2 GB size limit
+
+    try:
+        msg = await app.get_messages(chat_id, message_id)
+        custom_caption = get_user_caption_preference(sender)
+        final_caption = format_caption(msg.caption or '', sender, custom_caption)
+
+        # Parse target_chat_id and topic_id
+        topic_id = None
+        if '/' in str(target_chat_id):
+            target_chat_id, topic_id = map(int, target_chat_id.split('/', 1))
+
+        # Handle different media types
+        if msg.media:
+            result = await send_media_message(app, target_chat_id, msg, final_caption, topic_id)
+            return
+        elif msg.text:
+            result = await app.copy_message(target_chat_id, chat_id, message_id, reply_to_message_id=topic_id)
+            return
+
+        # Fallback if result is None
+        if result is None:
+            await edit.edit("Trying if it is a group...")
+            chat = await telethon_userbot.get_entity(f"@{chat_id}")
+            msg = await telethon_userbot.get_messages(chat.id, ids=message_id)
+
+            if not msg or isinstance(msg, types.MessageService) or not hasattr(msg, 'message'):
+                return
+
+            final_caption = format_caption(msg.message if msg.message else "", sender, custom_caption)
+            file = await telethon_userbot.download_media(
+                msg,
+                progress_callback=lambda current, total: progress_callback(current, total, sender)
+            )
+            file = await rename_file(file, sender)
+
+            if isinstance(msg.media, types.MessageMediaPhoto):
+                result = await app.send_photo(target_chat_id, file, caption=final_caption, reply_to_message_id=topic_id)
+            elif isinstance(msg.media, types.MessageMediaDocument):
+                if await is_file_size_exceeding(file, size_limit):
+                    await handle_large_file(file, sender, edit, final_caption)
+                    return
+                await upload_media(sender, target_chat_id, file, final_caption, edit, topic_id)
+            elif isinstance(msg.media, types.MessageMediaAudio):
+                if msg.media.audio.voice:
+                    result = await app.send_voice(target_chat_id, file, reply_to_message_id=topic_id)
+                else:
+                    result = await app.send_audio(target_chat_id, file, caption=final_caption, reply_to_message_id=topic_id)
+            elif msg.sticker:
+                result = await app.send_sticker(target_chat_id, msg.sticker.id, reply_to_message_id=topic_id)
+            else:
+                await edit.edit("Unsupported media type.")
+
+    except Exception as e:
+        print(f"Error : {e}")
+        pass
+
+    finally:
+        if file and os.path.exists(file):
+            os.remove(file)
+
+
+async def send_media_message_telethon(app, target_chat_id, msg, caption, topic_id):
+    try:
+        if msg.video:
+            return await app.send_video(target_chat_id, msg.video.file_id, caption=caption, reply_to_message_id=topic_id)
+        if msg.document:
+            return await app.send_document(target_chat_id, msg.document.file_id, caption=caption, reply_to_message_id=topic_id)
+        if msg.photo:
+            return await app.send_photo(target_chat_id, msg.photo.file_id, caption=caption, reply_to_message_id=topic_id)
+    except Exception as e:
+        print(f"Error while sending media: {e}")
+    
+    # Fallback to copy_message in case of any exceptions
+    return await app.copy_message(target_chat_id, msg.chat.id, msg.id, reply_to_message_id=topic_id)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+async def upload_media(sender, target_chat_id, file, caption, edit, topic_id):
+    try:
+        metadata = video_metadata(file)
+        width, height, duration = metadata['width'], metadata['height'], metadata['duration']
+        thumb_path = await screenshot(file, duration, sender)
+
+        video_formats = {'mp4', 'mkv', 'avi', 'mov'}
+        document_formats = {'pdf', 'docx', 'txt', 'epub'}
+        image_formats = {'jpg', 'png', 'jpeg'}
+        if file.split('.')[-1].lower() in video_formats:
                 dm = await app.send_video(
                     chat_id=target_chat_id,
                     video=file,
@@ -141,46 +526,9 @@ async def upload_media(sender, target_chat_id, file, caption, edit, topic_id):
                 )
                 await asyncio.sleep(2)
                 await dm.copy(LOG_GROUP)
+    
 
-        # Telethon upload
-        elif upload_method == "Telethon":
-            await edit.delete()
-            progress_message = await gf.send_message(sender, "**__Uploading...__**")
-            #caption = caption,
-            # await format_caption_to_html(caption)
-            uploaded = await fast_upload(
-                gf, file,
-                reply=progress_message,
-                name=None,
-                progress_bar_function=lambda done, total: progress_callback(done, total, sender)
-            )
-            await progress_message.delete()
-
-            attributes = [
-                DocumentAttributeVideo(
-                    duration=duration,
-                    w=width,
-                    h=height,
-                    supports_streaming=True
-                )
-            ] if file.split('.')[-1].lower() in video_formats else []
-
-            await gf.send_file(
-                target_chat_id,
-                uploaded,
-                caption=caption,
-                attributes=attributes,
-                reply_to=topic_id,
-                thumb=thumb_path
-            )
-            await gf.send_file(
-                LOG_GROUP,
-                uploaded,
-                caption=caption,
-                attributes=attributes,
-                thumb=thumb_path
-            )
-
+    
     except Exception as e:
         await app.send_message(LOG_GROUP, f"**Upload Failed:** {str(e)}")
         print(f"Error during media upload: {e}")
@@ -191,7 +539,7 @@ async def upload_media(sender, target_chat_id, file, caption, edit, topic_id):
         gc.collect()
 
 
-async def get_msg(userbot, telethonclient, sender, edit_id, msg_link, i, message):
+async def get_msg(userbot, sender, edit_id, msg_link, i, message):
     try:
         # Sanitize the message link
         msg_link = msg_link.split("?single")[0]
@@ -275,43 +623,14 @@ async def get_msg(userbot, telethonclient, sender, edit_id, msg_link, i, message
         file_name = await get_media_filename(msg)
         edit = await app.edit_message_text(sender, edit_id, "**Downloading...**")
 
-
-        upload_methods = await fetch_upload_method(sender)  # Fetch the upload method (Pyrogram or Telethon)
-        print(f"upload_method ... {upload_methods}")
-        await asyncio.sleep(5)
-
         # Pyrogram Download
-        if upload_methods == "Pyrogram":
-            file = await userbot.download_media(
+        file = await userbot.download_media(
                 msg,
                 file_name=file_name,
                 progress=progress_bar,
                 progress_args=("╭─────────────────────╮\n│      **__Downloading__...**\n├─────────────────────", edit, time.time())
             )
-        # Telethon __Downloading__
-        elif upload_methods == "Telethon":
-            #await edit.delete()
-            progress_messagee = await gf.send_message(sender, "**__Downloading__...__**")
-            try:
-                telethon_message = await telethonclient.get_messages(chat, ids=msg_id)
-                if not telethon_message:
-                    await progress_messagee.edit("Failed to fetch message with Telethon client.")
-                    await progress_messagee.delete(2)
-                    print("telethon_message error")
-                    return # Exit the function if message fetching fails
-            except Exception as e:
-                await progress_messagee.edit(f"Error fetching message with Telethon: {e}")
-                await progress_messagee.delete(2)
-                print("telethon_message error2")
-                return # Exit the function on error
-
-            print("fast_download start")
-            file = await fast_download(
-                telethonclient, telethon_message, # Pass the Telethon message object
-                reply=progress_messagee,
-                progress_bar_function=lambda done, total: progress_callback(done, total, sender)
-            )
-            await progress_messagee.delete()
+        
         caption = await get_final_caption(msg, sender)
 
         # Rename file
@@ -353,8 +672,6 @@ async def get_msg(userbot, telethonclient, sender, edit_id, msg_link, i, message
             os.remove(file)
         if edit:
             await edit.delete(2)
-
-
 
 async def clone_message(app, msg, target_chat_id, topic_id, edit_id, log_group):
     edit = await app.edit_message_text(target_chat_id, edit_id, "Cloning...")
