@@ -195,7 +195,7 @@ async def get_msg_telethon(telethon_userbot, sender, edit_id, msg_link, i, messa
         if file_size > size_limit:
             await handle_large_file(file, sender, edit, caption)
         else:
-            await upload_media(sender, target_chat_id, file, caption, edit, topic_id)
+            await upload_media_telethon(sender, target_chat_id, file, caption, edit, topic_id)
 
     except (ChannelInvalidError, ChannelPrivateError, ChatIdInvalidError, ChatInvalidError) as e:
         logger.error(f"Channel error: {e}")
@@ -209,10 +209,8 @@ async def get_msg_telethon(telethon_userbot, sender, edit_id, msg_link, i, messa
         if edit:
             await edit.delete()
 
-async def upload_media(sender, target_chat_id, file, caption, edit, topic_id):
-    """
-    Unified media upload function for both Pyrogram and Telethon
-    """
+
+async def upload_media_telethon(sender, target_chat_id, file, caption, edit, topic_id):
     try:
         # Get file metadata
         metadata = video_metadata(file)
@@ -223,57 +221,76 @@ async def upload_media(sender, target_chat_id, file, caption, edit, topic_id):
         document_formats = {'pdf', 'docx', 'txt', 'epub'}
         image_formats = {'jpg', 'png', 'jpeg'}
 
-        file_ext = file.split('.')[-1].lower()
-        
         # Delete the edit message since we'll use our own progress
         await edit.delete()
-        progress_message = await app.send_message(sender, "**__Uploading...__**")
+        progress_message = await gf.send_message(sender, "**__Uploading...__**")
 
-        if file_ext in video_formats:
-            dm = await app.send_video(
-                chat_id=target_chat_id,
-                video=file,
-                caption=caption,
-                height=height,
-                width=width,
+        # Upload with floodwait handling
+        try:
+            uploaded = await fast_upload(
+                gf, file,
+                reply=progress_message,
+                name=None,
+                progress_bar_function=lambda done, total: progress_callback(done, total, sender)
+            )
+        except FloodWaitError as fw:
+            await progress_message.edit(f"⏳ FloodWait: Sleeping for {fw.seconds} seconds...")
+            await asyncio.sleep(fw.seconds)
+            # Retry after floodwait
+            uploaded = await fast_upload(
+                gf, file,
+                reply=progress_message,
+                name=None,
+                progress_bar_function=lambda done, total: progress_callback(done, total, sender)
+            )
+
+        await progress_message.delete()
+
+        # Prepare attributes based on file type
+        attributes = []
+        if file.split('.')[-1].lower() in video_formats:
+            attributes.append(DocumentAttributeVideo(
                 duration=duration,
-                thumb=thumb_path,
-                reply_to_message_id=topic_id,
-                parse_mode=ParseMode.MARKDOWN,
-                progress=progress_bar,
-                progress_args=("╭─────────────────────╮\n│      **__Pyro Uploader__**\n├─────────────────────", edit, time.time())
-            )
-        elif file_ext in image_formats:
-            dm = await app.send_photo(
-                chat_id=target_chat_id,
-                photo=file,
-                caption=caption,
-                parse_mode=ParseMode.MARKDOWN,
-                progress=progress_bar,
-                reply_to_message_id=topic_id,
-                progress_args=("╭─────────────────────╮\n│      **__Pyro Uploader__**\n├─────────────────────", edit, time.time())
-            )
-        else:
-            dm = await app.send_document(
-                chat_id=target_chat_id,
-                document=file,
-                caption=caption,
-                thumb=thumb_path,
-                reply_to_message_id=topic_id,
-                progress=progress_bar,
-                parse_mode=ParseMode.MARKDOWN,
-                progress_args=("╭─────────────────────╮\n│      **__Pyro Uploader__**\n├─────────────────────", edit, time.time())
-            )
-        
-        await dm.copy(LOG_GROUP)
-    
+                w=width,
+                h=height,
+                supports_streaming=True
+            ))
+
+        # Send to target chat
+        await gf.send_file(
+            target_chat_id,
+            uploaded,
+            caption=caption,
+            attributes=attributes,
+            reply_to=topic_id,
+            thumb=thumb_path
+        )
+
+        # Send to log group
+        await gf.send_file(
+            LOG_GROUP,
+            uploaded,
+            caption=caption,
+            attributes=attributes,
+            thumb=thumb_path
+        )
+
     except Exception as e:
-        logger.error(f"Upload failed: {e}")
-        await app.send_message(LOG_GROUP, f"**Upload Failed:** {str(e)}")
+        await gf.send_message(LOG_GROUP, f"**Upload Failed:** {str(e)}")
+        print(f"Error during media upload: {e}")
+        raise  # Re-raise the exception for higher level handling
+
     finally:
+        # Cleanup
         if thumb_path and os.path.exists(thumb_path):
             os.remove(thumb_path)
+        if 'progress_message' in locals():
+            try:
+                await progress_message.delete()
+            except:
+                pass
         gc.collect()
+
 
 async def clone_message_telethon(app, msg, target_chat_id, topic_id, edit_id, log_group):
     """Clone message content to target chat"""
@@ -407,7 +424,7 @@ async def copy_message_with_chat_id_telethon(app, telethon_userbot, sender, chat
                 if await is_file_size_exceeding(file, size_limit):
                     await handle_large_file(file, sender, edit, final_caption)
                     return
-                await upload_media(sender, target_chat_id, file, final_caption, edit, topic_id)
+                await upload_media_telethon(sender, target_chat_id, file, final_caption, edit, topic_id)
             elif isinstance(msg.media, types.MessageMediaAudio):
                 if msg.media.audio.voice:
                     result = await app.send_voice(target_chat_id, file, reply_to_message_id=topic_id)
