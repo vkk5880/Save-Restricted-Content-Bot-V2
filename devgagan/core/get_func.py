@@ -40,8 +40,13 @@ from pyrogram.types import Message
 from config import MONGO_DB as MONGODB_CONNECTION_STRING, LOG_GROUP, OWNER_ID, STRING, API_ID, CONTACT, API_HASH
 from devgagan.core.mongo.db import set_session, remove_session, get_data
 from devgagantools import fast_upload
+from FastTelethonhelper import fast_download
 from devgagan.core.func import *
 from devgagan.modules.shrink import is_user_verified
+from telethon import TelegramClient, events, Button
+from devgagan import app
+from devgagan import sex as gf
+
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
