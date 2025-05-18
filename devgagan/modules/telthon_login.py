@@ -10,7 +10,7 @@
 # Version: 2.0.7
 # License: MIT License
 # ---------------------------------------------------
-
+from devgagan import app
 from pyrogram import Client, filters
 from telethon import TelegramClient
 from telethon.sessions import StringSession
