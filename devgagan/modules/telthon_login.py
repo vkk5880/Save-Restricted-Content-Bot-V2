@@ -107,6 +107,7 @@ async def telethon_login_handler(client, message):
         
         # Get session string and save
         session_string = StringSession.save(telethon_client.session)
+        await db.set_telethon_session(user_id, session_string)
         await save_telethon_session(user_id, session_string, phone_number)
         
         await message.reply(
