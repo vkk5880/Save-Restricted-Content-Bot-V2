@@ -18,6 +18,7 @@ import time
 import gc
 import os
 import re
+from pyrogram.enums import ParseMode
 import logging
 from typing import Callable
 from telethon import TelegramClient, events, Button, types
@@ -457,69 +458,94 @@ async def send_media_message_telethon(app, target_chat_id, msg, caption, topic_i
     return await app.copy_message(target_chat_id, msg.chat.id, msg.id, reply_to_message_id=topic_id)
 
 
-
-
-
 async def upload_media(sender, target_chat_id, file, caption, edit, topic_id):
+    
+    thumb_path = None # Initialize thumb_path to None
+
     try:
-        metadata = video_metadata(file)
-        width, height, duration = metadata['width'], metadata['height'], metadata['duration']
-        thumb_path = await screenshot(file, duration, sender)
+        
+        try:
+            metadata = video_metadata(file)
+            width, height, duration = metadata['width'], metadata['height'], metadata['duration']
+            thumb_path = await screenshot(file, duration, sender)
+        except Exception:
+            # Handle cases where metadata or screenshot fails (e.g., non-video file)
+            width, height, duration = None, None, None
+            thumb_path = None # Ensure thumb_path is None if screenshot fails
+
 
         video_formats = {'mp4', 'mkv', 'avi', 'mov'}
-        document_formats = {'pdf', 'docx', 'txt', 'epub'}
+        document_formats = {'pdf', 'docx', 'txt', 'epub'} # document_formats is defined but not used in the current logic
         image_formats = {'jpg', 'png', 'jpeg'}
-        if file.split('.')[-1].lower() in video_formats:
-                dm = await app.send_video(
-                    chat_id=target_chat_id,
-                    video=file,
-                    caption=caption,
-                    height=height,
-                    width=width,
-                    duration=duration,
-                    thumb=thumb_path,
-                    reply_to_message_id=topic_id,
-                    parse_mode=ParseMode.MARKDOWN,
-                    progress=progress_bar,
-                    progress_args=("╭─────────────────────╮\n│      **__Pyro Uploader__**\n├─────────────────────", edit, time.time())
-                )
-                await dm.copy(LOG_GROUP)
-                
-        elif file.split('.')[-1].lower() in image_formats:
-                dm = await app.send_photo(
-                    chat_id=target_chat_id,
-                    photo=file,
-                    caption=caption,
-                    parse_mode=ParseMode.MARKDOWN,
-                    progress=progress_bar,
-                    reply_to_message_id=topic_id,
-                    progress_args=("╭─────────────────────╮\n│      **__Pyro Uploader__**\n├─────────────────────", edit, time.time())
-                )
-                await dm.copy(LOG_GROUP)
-            else:
-                dm = await app.send_document(
-                    chat_id=target_chat_id,
-                    document=file,
-                    caption=caption,
-                    thumb=thumb_path,
-                    reply_to_message_id=topic_id,
-                    progress=progress_bar,
-                    parse_mode=ParseMode.MARKDOWN,
-                    progress_args=("╭─────────────────────╮\n│      **__Pyro Uploader__**\n├─────────────────────", edit, time.time())
-                )
-                await asyncio.sleep(2)
-                await dm.copy(LOG_GROUP)
-    
 
-    
+        # Determine file extension
+        file_extension = file.split('.')[-1].lower()
+
+        # Check file format and upload accordingly
+        if file_extension in video_formats:
+            # Correctly indented block for video upload
+            dm = await app.send_video(
+                chat_id=target_chat_id,
+                video=file,
+                caption=caption,
+                height=height,
+                width=width,
+                duration=duration,
+                thumb=thumb_path,
+                reply_to_message_id=topic_id,
+                parse_mode=ParseMode.MARKDOWN,
+                progress=progress_bar,
+                progress_args=("╭─────────────────────╮\n│      **__Pyro Uploader__**\n├─────────────────────", edit, time.time())
+            )
+            await dm.copy(LOG_GROUP) # Copy to log group
+
+        elif file_extension in image_formats:
+            # Correctly indented block for image upload
+            dm = await app.send_photo(
+                chat_id=target_chat_id,
+                photo=file,
+                caption=caption,
+                parse_mode=ParseMode.MARKDOWN,
+                progress=progress_bar,
+                reply_to_message_id=topic_id,
+                progress_args=("╭─────────────────────╮\n│      **__Pyro Uploader__**\n├─────────────────────", edit, time.time())
+            )
+            await dm.copy(LOG_GROUP) # Copy to log group
+
+        else:
+            # Correctly indented block for document upload (covers other formats)
+            dm = await app.send_document(
+                chat_id=target_chat_id,
+                document=file,
+                caption=caption,
+                thumb=thumb_path, # Using thumb for document might not be standard, check Pyrogram docs
+                reply_to_message_id=topic_id,
+                progress=progress_bar,
+                parse_mode=ParseMode.MARKDOWN,
+                progress_args=("╭─────────────────────╮\n│      **__Pyro Uploader__**\n├─────────────────────", edit, time.time())
+            )
+            await asyncio.sleep(2) # Added a small delay as in your original code
+            await dm.copy(LOG_GROUP) # Copy to log group
+
+
     except Exception as e:
+        # Catch any exceptions during the process and log/send an error message
         await app.send_message(LOG_GROUP, f"**Upload Failed:** {str(e)}")
         print(f"Error during media upload: {e}")
 
     finally:
+        # Clean up the thumbnail file if it was created
         if thumb_path and os.path.exists(thumb_path):
-            os.remove(thumb_path)
+            try:
+                os.remove(thumb_path)
+            except Exception as e:
+                print(f"Error removing thumbnail file {thumb_path}: {e}")
+
+        # Trigger garbage collection
         gc.collect()
+
+
+
 
 
 async def get_msg(userbot, sender, edit_id, msg_link, i, message):
