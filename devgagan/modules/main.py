@@ -73,8 +73,8 @@ DB_NAME = "smart_users"
 COLLECTION_NAME = "super_user"
 
 mongo_app = pymongo.MongoClient(MONGODB_CONNECTION_STRING)
-db = mongo_app[DB_NAME]
-collection = db[COLLECTION_NAME]
+mongo_db = mongo_app[DB_NAME]
+collection = mongo_db[COLLECTION_NAME]
 
 async def fetch_upload_method(message, user_id):
     """Fetch the user's preferred upload method."""
