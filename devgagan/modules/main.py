@@ -222,7 +222,70 @@ async def single_link(_, message):
 
 from pyrogram import Client, filters
 
-async def initialize_userbot(user_id): # this ensure the single startup .. even if logged in or not
+
+
+async def initialize_telethon_userbot(user_id):
+    """Initialize and verify Telethon userbot with complete status checking"""
+    try:
+        # 1. Get session from DB
+        sessions = await db.get_sessions(user_id)
+        if not sessions or not sessions.get("telethon_session_string"):
+            logger.warning(f"No Telethon session found for user {user_id}")
+            return None
+
+        # 2. Create client instance
+        telethon_userbot = TelegramClient(
+            session=StringSession(sessions["telethon_session_string"]),
+            api_id=API_ID,
+            api_hash=API_HASH,
+            device_model="iPhone 16 Pro",
+            system_version="13.3.1"
+        )
+
+        # 3. Start connection with verification
+        try:
+            await telethon_userbot.start()
+            
+            # 4. Verify active connection
+            if not telethon_userbot.is_connected():
+                logger.error("Start completed but not actually connected")
+                await telethon_userbot.disconnect()
+                return None
+
+            # 5. Verify authorization
+            if not await telethon_userbot.is_user_authorized():
+                logger.error("Session invalid - not authorized")
+                await telethon_userbot.disconnect()
+                await db.remove_telethon_session(user_id)  # Clean invalid session
+                return None
+
+            # 6. Test API call
+            try:
+                me = await telethon_userbot.get_me()
+                logger.info(f"Successfully started as @{me.username}")
+                return telethon_userbot
+            except Exception as api_error:
+                logger.error(f"API test failed: {str(api_error)}")
+                await telethon_userbot.disconnect()
+                return None
+
+        except (ConnectionError, TimeoutError) as e:
+            logger.error(f"Connection failed: {str(e)}")
+            return None
+        except AuthKeyError as e:
+            logger.error(f"Invalid auth key: {str(e)}")
+            await db.remove_telethon_session(user_id)
+            return None
+
+    except Exception as e:
+        logger.error(f"Unexpected error: {str(e)}", exc_info=True)
+        return None
+
+
+
+
+
+async def initialize_userbots(user_id): # this ensure the single startup .. even if logged in or not
     """Initialize the userbot session for the given user."""
     data = await db.get_data(user_id)
     if data and data.get("session"):
