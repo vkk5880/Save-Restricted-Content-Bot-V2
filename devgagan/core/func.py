@@ -22,6 +22,13 @@ import cv2
 from pyrogram.errors import FloodWait, InviteHashInvalid, InviteHashExpired, UserAlreadyParticipant, UserNotParticipant
 from datetime import datetime as dt
 import asyncio, subprocess, re, os, time
+from telethon.tl.functions.messages import ImportChatInviteRequest
+from telethon.errors import (
+    UserAlreadyParticipantError,
+    InviteHashInvalidError,
+    InviteHashExpiredError,
+    FloodWaitError
+)
 async def chk_user(message, user_id):
     user = await premium_users()
     if user_id in user or user_id in OWNER_ID:
@@ -163,6 +170,31 @@ async def userbot_join(userbot, invite_link):
     except Exception as e:
         print(e)
         return "Could not join, try joining manually."
+
+
+
+
+async def telethon_userbot_join(telethon_userbot, invite_link):
+    try:
+        # Remove '+' from invite link if present
+        if 't.me/+' in invite_link:
+            invite_link = invite_link.replace('t.me/+', 't.me/joinchat/')
+        
+        await telethon_userbot(ImportChatInviteRequest(invite_link.split('/')[-1]))
+        return "Successfully joined the Channel"
+    except UserAlreadyParticipantError:
+        return "User is already a participant."
+    except (InviteHashInvalidError, InviteHashExpiredError):
+        return "Could not join. Maybe your link is expired or Invalid."
+    except FloodWaitError as e:
+        return f"Too many requests, try again in {e.seconds} seconds."
+    except Exception as e:
+        print(e)
+        return "Could not join, try joining manually."
+
+
+
+
 def get_link(string):
     regex = r"(?i)\b((?:https?://|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:'\".,<>?«»“”‘’]))"
     url = re.findall(regex,string)   
