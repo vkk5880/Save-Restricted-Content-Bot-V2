@@ -36,6 +36,16 @@ from pyrogram.handlers import MessageHandler, CallbackQueryHandler
 from telethon.errors import FloodWaitError
 from devgagan.modules.shrink import is_user_verified
 from config import MONGO_DB as MONGODB_CONNECTION_STRING, LOG_GROUP, OWNER_ID, STRING, API_ID, CONTACT, API_HASH
+import logging
+from telethon import TelegramClient
+from telethon.sessions import StringSession
+from telethon.errors import (
+    SessionPasswordNeededError,
+    AuthKeyError,
+    AccessTokenExpiredError,
+    AuthKeyDuplicatedError
+)
+import asyncio
 '''
 from devgagan.modules.connect_user import (
     connect_user, 
@@ -220,12 +230,18 @@ async def single_link(_, message):
             pass
 
 
-from pyrogram import Client, filters
 
 
+
+
+# Initialize logger at module level
+logger = logging.getLogger(__name__)
 
 async def initialize_telethon_userbot(user_id):
-    """Initialize and verify Telethon userbot with complete status checking"""
+    """
+    Initialize and verify Telethon userbot with complete status checking
+    Returns: TelegramClient instance or None if initialization fails
+    """
     try:
         # 1. Get session from DB
         sessions = await db.get_sessions(user_id)
@@ -256,7 +272,7 @@ async def initialize_telethon_userbot(user_id):
             if not await telethon_userbot.is_user_authorized():
                 logger.error("Session invalid - not authorized")
                 await telethon_userbot.disconnect()
-                await db.remove_telethon_session(user_id)  # Clean invalid session
+                await db.remove_telethon_session(user_id)
                 return None
 
             # 6. Test API call
@@ -269,7 +285,7 @@ async def initialize_telethon_userbot(user_id):
                 await telethon_userbot.disconnect()
                 return None
 
-        except (ConnectionError, TimeoutError) as e:
+        except (ConnectionError, asyncio.TimeoutError) as e:
             logger.error(f"Connection failed: {str(e)}")
             return None
         except AuthKeyError as e:
