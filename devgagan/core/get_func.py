@@ -75,7 +75,7 @@ else:
     pro = None
     logger.info("STRING is not available. 'app' is set to None.")
 
-async def get_msg_telethon(telethon_userbot, sender, edit_id, msg_link, i, message):
+async def get_msg_telethons(telethon_userbot, sender, edit_id, msg_link, i, message):
     try:
         # Sanitize the message link
         msg_link = msg_link.split("?single")[0]
@@ -223,7 +223,7 @@ async def get_msg_telethon(telethon_userbot, sender, edit_id, msg_link, i, messa
             await edit.delete()
 
 
-async def get_msg_telethons(telethon_userbot, sender, edit_id, msg_link, i, message):
+async def get_msg_telethon(telethon_userbot, sender, edit_id, msg_link, i, message):
     """
     Handle message processing using Telethon client
     """
@@ -279,11 +279,11 @@ async def get_msg_telethons(telethon_userbot, sender, edit_id, msg_link, i, mess
 
         # Fetch the target message
         msg = await telethon_userbot.get_messages(chat, ids=msg_id)
-        fetched_message = None
-        if msg:
-            fetched_message = msg[0] # Get the message object
-            print("Fetched message object:", fetched_message)
-        if not msg or isinstance(msg, types.MessageService) or not hasattr(msg, 'message'):
+        if not msg:
+            return
+
+        # Handle service messages
+        if isinstance(msg, types.MessageService):
             return
 
         target_chat_id = user_chat_ids.get(message.chat.id, message.chat.id)
@@ -291,14 +291,14 @@ async def get_msg_telethons(telethon_userbot, sender, edit_id, msg_link, i, mess
         if '/' in str(target_chat_id):
             target_chat_id, topic_id = map(int, target_chat_id.split('/', 1))
 
-        # Handle different message types
-        if isinstance(msg.media, types.MessageMediaWebPage):
-            print("Fetched message MessageMediaWebPage:")
-            await clone_message_telethon(app, msg, target_chat_id, topic_id, edit_id, LOG_GROUP)
+        # Handle text messages without media
+        if not hasattr(msg, 'media') or msg.media is None:
+            if msg.text:
+                await clone_message_telethon(app, msg, target_chat_id, topic_id, edit_id, LOG_GROUP)
             return
 
-        if msg.text:
-            print("Fetched message text:")
+        # Handle different media types
+        if isinstance(msg.media, types.MessageMediaWebPage):
             await clone_message_telethon(app, msg, target_chat_id, topic_id, edit_id, LOG_GROUP)
             return
 
@@ -306,24 +306,21 @@ async def get_msg_telethons(telethon_userbot, sender, edit_id, msg_link, i, mess
             await handle_sticker_telethon(app, msg, target_chat_id, topic_id, edit_id, LOG_GROUP)
             return
 
-        # Handle file media (photo, document, video)
+        # Handle file media (photo, document, video, audio)
         file_size = get_message_file_size_telethon(msg)
 
         if file_size and file_size > size_limit and pro is None:
             await app.edit_message_text(sender, edit_id, "**❌ 4GB Uploader not found**")
             return
 
-        file_name = await get_media_filename_telethon(msg)
         edit = await app.edit_message_text(sender, edit_id, "**Downloading...**")
         progress_message = await app.send_message(sender, "**__Downloading__...__**")
-        print("Fetched message Downloading:")
         
         try:
-            logger.info("Starting fast_download")
             file = await fast_download(
                 telethon_userbot, msg,
                 reply=progress_message,
-                progress_bar_function=lambda done, total: progress_callback(done, total, sender)
+                progress_bar_function=lambda done, total: dl_progress_callback(done, total, sender)
             )
             await progress_message.delete()
         except Exception as e:
@@ -332,31 +329,42 @@ async def get_msg_telethons(telethon_userbot, sender, edit_id, msg_link, i, mess
             return
             
         caption = await get_final_caption_telethon(msg, sender)
-
-        # Rename file
         file = await rename_file(file, sender)
-        
-        if isinstance(msg.media, types.MessageMediaAudio):
-            print("Fetched message MessageMediaAudio:")
+
+        # Handle specific media types
+        if isinstance(msg.media, types.MessageMediaPhoto):
+            result = await app.send_photo(target_chat_id, file, caption=caption, reply_to_message_id=topic_id)
+        elif isinstance(msg.media, types.MessageMediaDocument):
+            # Check for specific document types
+            if hasattr(msg.media.document, 'mime_type'):
+                if 'video' in msg.media.document.mime_type:
+                    result = await app.send_video(target_chat_id, file, caption=caption, reply_to_message_id=topic_id)
+                elif 'audio' in msg.media.document.mime_type:
+                    if any(isinstance(attr, types.DocumentAttributeVoice) for attr in msg.media.document.attributes):
+                        result = await app.send_voice(target_chat_id, file, reply_to_message_id=topic_id)
+                    else:
+                        result = await app.send_audio(target_chat_id, file, caption=caption, reply_to_message_id=topic_id)
+                else:
+                    result = await app.send_document(target_chat_id, file, caption=caption, reply_to_message_id=topic_id)
+            else:
+                result = await app.send_document(target_chat_id, file, caption=caption, reply_to_message_id=topic_id)
+        elif isinstance(msg.media, types.MessageMediaAudio):
             if msg.media.audio.voice:
                 result = await app.send_voice(target_chat_id, file, reply_to_message_id=topic_id)
             else:
                 result = await app.send_audio(target_chat_id, file, caption=caption, reply_to_message_id=topic_id)
-            await result.copy(LOG_GROUP)
-            await edit.delete()
-            return
-
-        if isinstance(msg.media, types.MessageMediaPhoto):
-            result = await app.send_photo(target_chat_id, file, caption=caption, reply_to_message_id=topic_id)
-            await result.copy(LOG_GROUP)
-            await edit.delete()
-            return
-
-        # Upload media
-        if file_size > size_limit:
-            await handle_large_file(file, sender, edit, caption)
         else:
-            await upload_media_telethon(sender, target_chat_id, file, caption, edit, topic_id)
+            # Fallback for other media types
+            if file_size > size_limit:
+                await handle_large_file(file, sender, edit, caption)
+            else:
+                await upload_media_telethon(sender, target_chat_id, file, caption, edit, topic_id)
+            return
+
+        # Log the sent message
+        if result:
+            await result.copy(LOG_GROUP)
+        await edit.delete()
 
     except (ChannelInvalidError, ChannelPrivateError, ChatIdInvalidError, ChatInvalidError) as e:
         logger.error(f"Channel error: {e}")
@@ -369,6 +377,7 @@ async def get_msg_telethons(telethon_userbot, sender, edit_id, msg_link, i, mess
             os.remove(file)
         if edit:
             await edit.delete()
+
 
 
 async def upload_media_telethon(sender, target_chat_id, file, caption, edit, topic_id):
@@ -1550,7 +1559,7 @@ def progress_callback(done, total, user_id):
     # Format the final output as needed
     final = (
         f"╭──────────────────╮\n"
-        f"│     **__SpyLib ⚡ Uploader__**       \n"
+        f"│     **__Vkk ⚡ Uploader__**       \n"
         f"├──────────\n"
         f"│ {progress_bar}\n\n"
         f"│ **__Progress:__** {percent:.2f}%\n"
@@ -1613,7 +1622,7 @@ def dl_progress_callback(done, total, user_id):
     # Format the final output as needed
     final = (
         f"╭──────────────────╮\n"
-        f"│     **__SpyLib ⚡ Downloader__**       \n"
+        f"│     **__Vkk ⚡ Downloader__**       \n"
         f"├──────────\n"
         f"│ {progress_bar}\n\n"
         f"│ **__Progress:__** {percent:.2f}%\n"
