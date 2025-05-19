@@ -13,11 +13,13 @@
 
 from config import MONGO_DB
 from motor.motor_asyncio import AsyncIOMotorClient as MongoCli
-
+import json # Import json for printing in get_sessions
+import os # Import os for cleanup in upload_media if it's in this file (though unlikely)
+import gc
 # Initialize MongoDB Client
 mongo = MongoCli(MONGO_DB)
-db = mongo.user_data
-db = db.users_data_db  # Setting the database
+database = mongo.user_data
+db = database.users_data_db  # Setting the database
 
 # ✅ Corrected way to get collection reference
 user_sessions_real = db["user_sessions_real"]  # ✅ Corrected syntax
