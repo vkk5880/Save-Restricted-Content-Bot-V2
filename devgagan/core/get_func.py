@@ -481,15 +481,15 @@ async def get_msg_telethon(telethon_userbot, sender, edit_id, msg_link, i, messa
 
             with open(temp_file, 'wb') as f:
                 def progress_callback(done, total):
-                    asyncio.create_task(dl_progress_callback(done, total, sender))
+                    return dl_progress_callback(done, total, sender)
 
-                    await download_file(
-                        telethon_userbot,
-                        msg.document if hasattr(msg, 'document') else msg.media,
-                        f,
-                        progress_callback=progress_callback,
-                        speed_limit=15 * 1024 * 1024  # 15 Mbps limit
-                    )
+                await download_file(
+                    telethon_userbot,
+                    msg.document if hasattr(msg, 'document') else msg.media,
+                    f,
+                    progress_callback=progress_callback,
+                    speed_limit=15 * 1024 * 1024  # 15 Mbps limit
+                )
             """file = await fast_download(
                 telethon_userbot, msg,
                 reply=progress_message,
@@ -554,9 +554,6 @@ async def get_msg_telethon(telethon_userbot, sender, edit_id, msg_link, i, messa
             os.remove(file)
         if edit:
             await edit.delete()
-
-
-
 
 async def get_msg_telethonnnnnn(telethon_userbot, sender, edit_id, msg_link, i, message):
     """
