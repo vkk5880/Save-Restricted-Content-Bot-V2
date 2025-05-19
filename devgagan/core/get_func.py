@@ -28,7 +28,7 @@ from telethon.errors import (
     ChatInvalidError,
     FloodWaitError
 )
-from parallel_transfer import download_file, upload_file
+from devgagan.core.parallel_transfer import download_file, upload_file
 from telethon import functions, types
 from telethon.tl.types import DocumentAttributeVideo, Message
 from telethon.sessions import StringSession
