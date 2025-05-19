@@ -28,6 +28,7 @@ from telethon.errors import (
     ChatInvalidError,
     FloodWaitError
 )
+from parallel_transfer import download_file, upload_file
 from telethon import functions, types
 from telethon.tl.types import DocumentAttributeVideo, Message
 from telethon.sessions import StringSession
@@ -223,7 +224,7 @@ async def get_msg_telethons(telethon_userbot, sender, edit_id, msg_link, i, mess
             await edit.delete()
 
 
-async def get_msg_telethon(telethon_userbot, sender, edit_id, msg_link, i, message):
+async def get_msg_telethonok(telethon_userbot, sender, edit_id, msg_link, i, message):
     """
     Handle message processing using Telethon client
     """
@@ -377,6 +378,208 @@ async def get_msg_telethon(telethon_userbot, sender, edit_id, msg_link, i, messa
             os.remove(file)
         if edit:
             await edit.delete()
+
+
+
+
+
+
+
+async def get_msg_telethon(telethon_userbot, sender, edit_id, msg_link, i, message):
+    """
+    Handle message processing using Telethon client with parallel transfers
+    """
+    try:
+        # [Previous code remains the same until file download section...]
+        # Sanitize the message link
+        msg_link = msg_link.split("?single")[0]
+        chat, msg_id = None, None
+        saved_channel_ids = load_saved_channel_ids()
+        size_limit = 2 * 1024 * 1024 * 1024  # 2 GB size limit
+        file = ''
+        edit = ''
+        
+        # Extract chat and message ID for valid Telegram links
+        if 't.me/c/' in msg_link or 't.me/b/' in msg_link:
+            parts = msg_link.split("/")
+            if 't.me/b/' in msg_link:
+                chat = parts[-2]
+                msg_id = int(parts[-1]) + i
+            else:
+                chat = int('-100' + parts[parts.index('c') + 1])
+                msg_id = int(parts[-1]) + i
+
+            if chat in saved_channel_ids:
+                await app.edit_message_text(
+                    message.chat.id, edit_id,
+                    "Sorry! This channel is protected by **Admin**."
+                )
+                return
+
+        elif '/s/' in msg_link:
+            edit = await app.edit_message_text(sender, edit_id, "Story Link Detected...")
+            if telethon_userbot is None:
+                await edit.edit("Login in bot save stories...")
+                return
+            parts = msg_link.split("/")
+            chat = parts[3]
+
+            if chat.isdigit():    # this is for channel stories
+                chat = f"-100{chat}"
+
+            msg_id = int(parts[-1])
+            await download_user_stories_telethon(telethon_userbot, chat, msg_id, edit, sender)
+            await edit.delete()
+            return
+
+        else:
+            edit = await app.edit_message_text(sender, edit_id, "Public link detected...")
+            chat = msg_link.split("t.me/")[1].split("/")[0]
+            msg_id = int(msg_link.split("/")[-1])
+            await copy_message_with_chat_id_telethon(app, telethon_userbot, sender, chat, msg_id, edit)
+            await edit.delete()
+            return
+
+        # Fetch the target message
+        msg = await telethon_userbot.get_messages(chat, ids=msg_id)
+        if not msg:
+            return
+
+        # Handle service messages
+        if isinstance(msg, types.MessageService):
+            return
+
+        target_chat_id = user_chat_ids.get(message.chat.id, message.chat.id)
+        topic_id = None
+        if '/' in str(target_chat_id):
+            target_chat_id, topic_id = map(int, target_chat_id.split('/', 1))
+
+        # Handle text messages without media
+        if not hasattr(msg, 'media') or msg.media is None:
+            if msg.text:
+                await clone_message_telethon(app, msg, target_chat_id, topic_id, edit_id, LOG_GROUP)
+            return
+
+        # Handle different media types
+        if isinstance(msg.media, types.MessageMediaWebPage):
+            await clone_message_telethon(app, msg, target_chat_id, topic_id, edit_id, LOG_GROUP)
+            return
+
+        if msg.sticker:
+            await handle_sticker_telethon(app, msg, target_chat_id, topic_id, edit_id, LOG_GROUP)
+            return
+
+        
+        # Handle file media (photo, document, video, audio)
+        file_size = get_message_file_size_telethon(msg)
+
+        if file_size and file_size > size_limit and pro is None:
+            await app.edit_message_text(sender, edit_id, "**❌ 4GB Uploader not found**")
+            return
+
+        edit = await app.edit_message_text(sender, edit_id, "**Downloading...**")
+        progress_message = await app.send_message(sender, "**__Downloading__...__**")
+        
+        try:
+            # Create a temporary file for downloading
+            temp_file = f"temp_{msg_id}_{i}"
+            
+            # Check if it's a video (we'll handle videos differently for better performance)
+            is_video = (isinstance(msg.media, types.MessageMediaDocument) and 
+                        any(isinstance(attr, DocumentAttributeVideo) 
+                            for attr in msg.media.document.attributes))
+            
+            # Use parallel download for videos and large files
+            if is_video or file_size > 50 * 1024 * 1024:  # 50MB threshold
+                with open(temp_file, 'wb') as f:
+                    def progress_callback(done, total):
+                        asyncio.create_task(
+                            dl_progress_callback(done, total, sender)
+                        )
+                    
+                    await download_file(
+                        telethon_userbot,
+                        msg.document if hasattr(msg, 'document') else msg.media,
+                        f,
+                        progress_callback=progress_callback,
+                        speed_limit=15 * 1024 * 1024  # 15 Mbps limit
+                    )
+            else:
+                # Fallback to regular download for small files
+                file = await fast_download(
+                    telethon_userbot, msg,
+                    reply=progress_message,
+                    progress_bar_function=lambda done, total: dl_progress_callback(done, total, sender)
+                )
+            
+            await progress_message.delete()
+        except Exception as e:
+            await progress_message.edit(f"Error downloading with Telethon: {e}")
+            await progress_message.delete()
+            return
+            
+        caption = await get_final_caption_telethon(msg, sender)
+        file = await rename_file(temp_file if is_video else file, sender)
+
+        # Handle specific media types with optimized upload for videos
+        if isinstance(msg.media, types.MessageMediaPhoto):
+            result = await app.send_photo(target_chat_id, file, caption=caption, reply_to_message_id=topic_id)
+        elif isinstance(msg.media, types.MessageMediaDocument):
+            # Special handling for videos with parallel upload
+            if is_video:
+                with open(file, 'rb') as f:
+                    input_file = await upload_file(
+                        telethon_userbot,
+                        f,
+                        os.path.basename(file),
+                        progress_callback=lambda cur, total: dl_progress_callback(cur, total, sender),
+                        speed_limit=15 * 1024 * 1024  # 15 Mbps upload limit
+                    )
+                    result = await app.send_video(
+                        target_chat_id,
+                        input_file,
+                        caption=caption,
+                        reply_to_message_id=topic_id,
+                        supports_streaming=True
+                    )
+            elif 'audio' in msg.media.document.mime_type:
+                if any(isinstance(attr, types.DocumentAttributeVoice) for attr in msg.media.document.attributes):
+                    result = await app.send_voice(target_chat_id, file, reply_to_message_id=topic_id)
+                else:
+                    result = await app.send_audio(target_chat_id, file, caption=caption, reply_to_message_id=topic_id)
+            else:
+                result = await app.send_document(target_chat_id, file, caption=caption, reply_to_message_id=topic_id)
+        
+        # [Rest of your existing code...]
+        if result:
+            await result.copy(LOG_GROUP)
+            await edit.delete()
+
+
+    except Exception as e:
+        logger.error(f"Error in get_msg_telethon: {e}")
+    finally:
+        # Clean up temporary files
+        if 'temp_file' in locals() and os.path.exists(temp_file):
+            os.remove(temp_file)
+        if 'file' in locals() and os.path.exists(file):
+            os.remove(file)
+        if edit:
+            await edit.delete()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
