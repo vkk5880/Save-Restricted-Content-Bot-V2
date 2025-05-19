@@ -507,7 +507,7 @@ async def batch_link(_, message):
                     if upload_methods == "Pyrogram" and userbot:
                         await process_special_links(userbot, user_id, msg, link)
                     elif upload_methods == "Telethon" and telethon_userbot:
-                        await process_special_links_telethon(telethon_userbot, user_id, msg, link)
+                        await await get_msg_telethons(telethon_userbot, user_id, msg_id, link, i-cs, message)
                     else:
                         await app.send_message(message.chat.id, "Login in bot first ...")
                         break
