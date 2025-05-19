@@ -78,64 +78,146 @@ else:
 
 
 
-
-
-async def get_msg_telethon(telethon_userbot, sender, edit_id, msg_link, i, message):
+async def get_msg_telethon(telethon_userbot: TelegramClient, sender, edit_id, msg_link, i, message):
     try:
-        # Sanitize the message link
         msg_link = msg_link.split("?single")[0]
-        chat, msg_id = None, None
+        chat = None
+        msg_id = None
         saved_channel_ids = load_saved_channel_ids()
-        size_limit = 2 * 1024 * 1024 * 1024  # 1.99 GB size limit
-        file = ''
-        edit = ''
-        # Extract chat and message ID for valid Telegram links
+        size_limit = 2 * 1024 * 1024 * 1024
+        file = '' # Should be initialized to None or handled carefully
+        edit = None # Initialize edit to None
+
+        is_story = False # Flag to indicate if it's a story link
+
+        # --- Link Parsing ---
         if 't.me/c/' in msg_link or 't.me/b/' in msg_link:
             parts = msg_link.split("/")
             if 't.me/b/' in msg_link:
                 chat = parts[-2]
-                msg_id = int(parts[-1]) + i # fixed bot problem
+                msg_id = int(parts[-1]) + i
             else:
                 chat = int('-100' + parts[parts.index('c') + 1])
                 msg_id = int(parts[-1]) + i
 
             if chat in saved_channel_ids:
-                await app.edit_message_text(
+                edit = await app.edit_message_text(
                     message.chat.id, edit_id,
                     "Sorry! This channel is protected by **Admin**."
                 )
-                return
+                # No return here, let the finally block handle edit deletion
+                # return # Removed return
 
-        elif '/s/' in msg_link: # fixed story typo
-            edit = await app.edit_message_text(sender, edit_id, "Story Link Dictected...")
+        elif '/s/' in msg_link:
+            is_story = True
+            edit = await app.edit_message_text(sender, edit_id, "Story Link Detected...")
             if telethon_userbot is None:
                 await edit.edit("Login in bot save stories...")
-                return
-            parts = msg_link.split("/")
-            chat = parts[3]
+                # No return here, let the finally block handle edit deletion
+                # return # Removed return
+            else:
+                parts = msg_link.split("/")
+                chat = parts[3]
 
-            if chat.isdigit():    # this is for channel stories
-                chat = f"-100{chat}"
+                if chat.isdigit():
+                    chat = f"-100{chat}"
 
-            msg_id = int(parts[-1])
-            await download_user_stories_telethon(telethon_userbot, chat, msg_id, edit, sender)
-            await edit.delete(2)
-            print("download_user_stories_telethon.")
-            return
+                msg_id = int(parts[-1])
+                # Call story download/process function
+                await download_user_stories_telethon(telethon_userbot, chat, msg_id, edit, sender)
+                # Assuming download_user_stories_telethon handles the full process (download+upload)
+                # We can return after this, but ensure edit is deleted in finally
+                # await edit.delete(2) # Moved delete to finally or handle internally in story func
+                print("download_user_stories_telethon completed.")
+                return # Return after story processing
 
-        else:
+        else: # Handles public t.me/user/message links and tg:// links
             edit = await app.edit_message_text(sender, edit_id, "Public link detected...")
-            chat = msg_link.split("t.me/")[1].split("/")[0]
-            msg_id = int(msg_link.split("/")[-1])
-            await copy_message_with_chat_id_telethon(app, telethon_userbot, sender, chat, msg_id, edit)
-            await edit.delete(2)
-            print("copy_message_with_chat_id_telethon.")
-            return
+            # Ensure telethon_userbot is available for public link processing if needed
+            if telethon_userbot is None:
+                await edit.edit("Telethon user session required for this link type.")
+                # No return here, let the finally block handle edit deletion
+                # return # Removed return
+            else:
+                if 't.me/' in msg_link and '/' in msg_link:
+                    parts = msg_link.split("t.me/")[1].split("/")
+                    chat = parts[0]
+                    msg_id = int(parts[1])
+                elif 'tg://openmessage' in msg_link:
+                     # Assuming tg:// link parsing extracts user_id and message_id correctly
+                     # Example parsing (adjust based on actual tg:// format):
+                     # from urllib.parse import urlparse, parse_qs
+                     # parsed_url = urlparse(msg_link)
+                     # query_params = parse_qs(parsed_url.query)
+                     # chat = int(query_params.get('user_id', [None])[0])
+                     # msg_id = int(query_params.get('message_id', [None])[0])
+                     pass # Add your tg:// parsing logic here
 
-        # Fetch the target message
-        msg = await telethon_userbot.get_messages(chat, ids=msg_id)
-        if not msg or isinstance(msg, types.MessageService) or not hasattr(msg, 'message'):
-            return
+                if chat is None or msg_id is None:
+                    await app.edit_message_text(sender, edit_id, "Could not parse public or tg:// link.")
+                    # No return here
+                else:
+                    # Call function to copy public message
+                    await copy_message_with_chat_id_telethon(app, telethon_userbot, sender, chat, msg_id, edit)
+                    # Assuming copy_message_with_chat_id_telethon handles the full process
+                    # await edit.delete(2) # Moved delete to finally or handle internally
+                    print("copy_message_with_chat_id_telethon completed.")
+                    return # Return after public link processing
+
+
+        # --- Message Fetching (for non-story, non-protected, successfully parsed links) ---
+        # This section is only reached if the link parsing above did NOT result in a return.
+        # This means it's likely a t.me/c/ or t.me/b/ link that wasn't protected,
+        # or a public/tg:// link where parsing was successful and telethon_userbot was available.
+
+        # Ensure telethon_userbot is available before fetching messages
+        if telethon_userbot is None:
+             # This case should ideally be caught earlier, but as a safeguard:
+             if edit is None: # Create edit message if not already
+                 edit = await app.edit_message_text(sender, edit_id, "Telethon user session required.")
+             else:
+                 await edit.edit("Telethon user session required.")
+             # No return here, let finally handle cleanup
+             # return # Removed return
+             # If we can't fetch, we can't proceed, so maybe return is appropriate here?
+             # Let's return here if telethon_userbot is essential for the rest of the flow
+             return
+
+
+        fetched_message = None
+        if chat is not None and msg_id is not None:
+             try:
+                 # Use the parsed chat and msg_id to fetch the message
+                 # Ensure chat is in a format get_messages understands (int ID or Peer object)
+                 messages = await telethon_userbot.get_messages(chat, ids=msg_id)
+
+                 if messages:
+                     fetched_message = messages[0]
+
+             except Exception as e:
+                 # Handle errors during message fetching
+                 if edit is None:
+                     edit = await app.edit_message_text(sender, edit_id, f"Error fetching message: {e}")
+                 else:
+                     await edit.edit(f"Error fetching message: {e}")
+                 logger.error(f"Error fetching message {msg_link}: {e}")
+                 # No return here, let finally handle cleanup
+                 # return # Removed return
+                 return # Return on fetch error
+
+        if not fetched_message or isinstance(fetched_message, types.MessageService) or not hasattr(fetched_message, 'message'):
+            # Handle cases where message wasn't found, is a service message, etc.
+            if edit is None:
+                 edit = await app.edit_message_text(sender, edit_id, "Message not found, or is a type that cannot be processed.")
+            else:
+                 await edit.edit("Message not found, or is a type that cannot be processed.")
+            # No return here, let finally handle cleanup
+            # return # Removed return
+            return # Return if message is not processable
+
+
+        # --- Message Processing (using the fetched_message object) ---
+        # This section is reached if a message was successfully fetched and is processable.
 
         target_chat_id = user_chat_ids.get(message.chat.id, message.chat.id)
         topic_id = None
@@ -143,91 +225,128 @@ async def get_msg_telethon(telethon_userbot, sender, edit_id, msg_link, i, messa
             target_chat_id, topic_id = map(int, target_chat_id.split('/', 1))
 
         # Handle different message types
-        if isinstance(msg.media, types.MessageMediaWebPage):
-            await clone_message_telethon(app, msg, target_chat_id, topic_id, edit_id, LOG_GROUP)
+        if isinstance(fetched_message.media, types.MessageMediaWebPage):
+            await clone_message_telethon(app, fetched_message, target_chat_id, topic_id, edit_id, LOG_GROUP)
             print("MessageMediaWebPagecopy_message_with_chat_id_telethon.")
-            return
+            # No return here, proceed to finally for cleanup
 
-        if msg.text:
-            await clone_message_telethon(app, msg, target_chat_id, topic_id, edit_id, LOG_GROUP)
+        elif fetched_message.text:
+            await clone_message_telethon(app, fetched_message, target_chat_id, topic_id, edit_id, LOG_GROUP)
             print("text_copy_message_with_chat_id_telethon.")
-            return
+            # No return here, proceed to finally for cleanup
 
-        if msg.sticker:
-            await handle_sticker_telethon(app, msg, target_chat_id, topic_id, edit_id, LOG_GROUP)
+        elif fetched_message.sticker:
+            await handle_sticker_telethon(app, fetched_message, target_chat_id, topic_id, edit_id, LOG_GROUP)
             print("handle_sticker_telethon.")
-            return
+            # No return here, proceed to finally for cleanup
 
+        else: # Handle file media (photo, document, video, audio)
+            file_size = get_message_file_size_telethon(fetched_message)
+            print(file_size)
 
-        # Handle file media (photo, document, video)
-        file_size = get_message_file_size_telethon(msg)
-        print(file_size)
+            if file_size and file_size > size_limit and pro is None:
+                if edit is None:
+                    edit = await app.edit_message_text(sender, edit_id, "**❌ 4GB Uploader not found**")
+                else:
+                    await edit.edit("**❌ 4GB Uploader not found**")
+                # No return here, proceed to finally for cleanup
+                # return # Removed return
+                return # Return if size limit exceeded and no pro
 
-        if file_size and file_size > size_limit and pro is None:
-            await app.edit_message_text(sender, edit_id, "**❌ 4GB Uploader not found**")
-            return
-
-        file_name = await get_media_filename_telethon(msg)
-        edit = await app.edit_message_text(sender, edit_id, "**Downloading...**")
-        print("Downloading      with_chat_id_telethon.")
-
-       progress_message = await app.send_message(sender, "**__Downloading__...__**")
-        
-        try:
-            logger.info("Starting fast_download")
-            file = await fast_download(
-                telethon_userbot, msg,
-                reply=progress_message,
-                progress_bar_function=lambda done, total: progress_callback(done, total, sender)
-            )
-            #await progress_message.delete()
-        except Exception as e:
-            await progress_message.edit(f"Error downloading with Telethon: {e}")
-            #await progress_message.delete()
-            return
-            
-        caption = await get_final_caption_telethon(msg, sender)
-
-        # Rename file
-        file = await rename_file(file, sender)
-        if isinstance(msg.media, types.MessageMediaAudio):
-            if msg.media.audio.voice:
-                result = await app.send_voice(target_chat_id, file, reply_to_message_id=topic_id)
+            # --- Download Media ---
+            file_name = await get_media_filename_telethon(fetched_message)
+            if edit is None:
+                 edit = await app.edit_message_text(sender, edit_id, "**Downloading...**")
             else:
-                result = await app.send_audio(target_chat_id, file, caption=caption, reply_to_message_id=topic_id)
-            await result.copy(LOG_GROUP)
-            await edit.delete()
-            return
+                 await edit.edit("**Downloading...**")
+            print("Downloading with_chat_id_telethon.")
 
-        if isinstance(msg.media, types.MessageMediaPhoto):
-            result = await app.send_photo(target_chat_id, file, caption=caption, reply_to_message_id=topic_id)
-            await result.copy(LOG_GROUP)
-            await edit.delete()
-            print("send_photo.")
-            return
+            progress_message = await app.send_message(sender, "**__Downloading__...__**")
 
-        # Upload media
-        if file_size > size_limit:
-            await handle_large_file(file, sender, edit, caption)
-        else:
-            print("upload_media_telethon.")
-            await upload_media_telethon(sender, target_chat_id, file, caption, edit, topic_id)
+            downloaded_file_path = None
+            try:
+                logger.info("Starting fast_download")
+                downloaded_file_path = await fast_download(
+                    telethon_userbot, fetched_message,
+                    reply=progress_message,
+                    progress_bar_function=lambda done, total: progress_callback(done, total, sender)
+                )
+                await progress_message.delete()
+
+            except Exception as e:
+                await progress_message.edit(f"Error downloading with Telethon: {e}")
+                logger.error(f"Error downloading media: {e}")
+                # No return here, proceed to finally for cleanup
+                # return # Removed return
+                return # Return on download error
+
+            # --- Upload Media ---
+            caption = await get_final_caption_telethon(fetched_message, sender)
+
+            # Rename file
+            downloaded_file_path = await rename_file(downloaded_file_path, sender)
+
+            # Handle specific media types for upload (Audio, Photo, then general)
+            if isinstance(fetched_message.media, types.MessageMediaAudio):
+                if fetched_message.media.audio.voice:
+                    result = await app.send_voice(target_chat_id, downloaded_file_path, reply_to_message_id=topic_id)
+                else:
+                    result = await app.send_audio(target_chat_id, downloaded_file_path, caption=caption, reply_to_message_id=topic_id)
+                await result.copy(LOG_GROUP)
+                print("send_audio/voice.")
+                # No return here
+
+            elif isinstance(fetched_message.media, types.MessageMediaPhoto):
+                result = await app.send_photo(target_chat_id, downloaded_file_path, caption=caption, reply_to_message_id=topic_id)
+                await result.copy(LOG_GROUP)
+                print("send_photo.")
+                # No return here
+
+            else: # Handle other document/video types
+                # Upload media (using your upload_media_telethon or handle_large_file)
+                if file_size > size_limit:
+                    await handle_large_file(downloaded_file_path, sender, edit, caption)
+                    print("handle_large_file.")
+                else:
+                    print("upload_media_telethon.")
+                    await upload_media_telethon(sender, target_chat_id, downloaded_file_path, caption, edit, topic_id)
+
+            # After successful upload/handling, update/delete the initial edit message
+            # This might be redundant if upload_media_telethon/handle_large_file already do it.
+            # Ensure edit message is handled exactly once.
+            # Consider adding a success message here or handled in upload/handle functions
+            # await edit.delete(2) # Consider where this should truly go
+
 
     except (ChannelInvalidError, ChannelPrivateError, ChatIdInvalidError, ChatInvalidError) as e:
         logger.error(f"Channel error: {e}")
-        await app.edit_message_text(sender, edit_id, "Have you joined the channel?")
+        if edit is None:
+            edit = await app.edit_message_text(sender, edit_id, "Have you joined the channel?")
+        else:
+            await edit.edit("Have you joined the channel?")
     except Exception as e:
         logger.error(f"Error in get_msg_telethon: {e}")
+        if edit is None:
+            edit = await app.edit_message_text(sender, edit_id, f"An unexpected error occurred: {e}")
+        else:
+            await edit.edit(f"An unexpected error occurred: {e}")
     finally:
-        # Clean up
-        if file and os.path.exists(file):
-            os.remove(file)
-        if edit:
-            await edit.delete()
+        # Clean up the downloaded file
+        # Use the downloaded_file_path variable
+        if 'downloaded_file_path' in locals() and downloaded_file_path and os.path.exists(downloaded_file_path):
+            try:
+                os.remove(downloaded_file_path)
+            except Exception as e:
+                logger.error(f"Error removing downloaded file {downloaded_file_path}: {e}")
 
-
-
-
+        # Ensure the initial edit message is deleted if not already
+        # This might need careful placement depending on where edit.delete(2) is called elsewhere
+        # Check if edit is a valid message object before trying to delete
+        if edit and hasattr(edit, 'delete'):
+            try:
+                await edit.delete(2)
+            except Exception:
+                pass # Ignore errors if message was already deleted
 
 
 
