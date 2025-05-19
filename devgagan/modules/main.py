@@ -245,13 +245,13 @@ async def initialize_telethon_userbot(user_id):
     try:
         # 1. Get session from DB
         sessions = await db.get_sessions(user_id)
-        if not sessions or not sessions.get("telethon_session_string"):
+        if not sessions or not sessions.get("telethon_session"):
             logger.warning(f"No Telethon session found for user {user_id}")
             return None
 
         # 2. Create client instance
         telethon_userbot = TelegramClient(
-            session=StringSession(sessions["telethon_session_string"]),
+            session=StringSession(sessions["telethon_session"]),
             api_id=API_ID,
             api_hash=API_HASH,
             device_model="iPhone 16 Pro",
