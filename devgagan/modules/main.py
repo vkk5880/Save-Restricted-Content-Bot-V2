@@ -22,7 +22,7 @@ from pyrogram import filters, Client
 from devgagan import app
 from config import API_ID, API_HASH, FREEMIUM_LIMIT, PREMIUM_LIMIT, OWNER_ID
 from devgagan.core.get_func import get_msg
-from devgagan.core.get_func import get_msg_telethon, get_msg_telethon
+from devgagan.core.get_func import get_msg_telethon, get_msg_telethons
 from devgagan.core.func import *
 from devgagan.core.mongo import db
 from pyrogram.errors import FloodWait
