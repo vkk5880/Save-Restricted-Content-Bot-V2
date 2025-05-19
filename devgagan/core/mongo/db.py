@@ -70,7 +70,7 @@ async def set_telethon_session(user_id, telethon_session_string):
     )
 
 # Function to get both sessions
-async def get_sessions(user_id):
+async def get_sessionsss(user_id):
     """Get both Pyrogram and Telethon sessions"""
     data = await db.find_one({"_id": user_id})
     if data:
@@ -79,6 +79,48 @@ async def get_sessions(user_id):
             "telethon_session": data.get("telethon_session_string")
         }
     return None
+
+
+
+async def get_sessions(user_id):
+    """
+    Retrieve and print both Pyrogram and Telethon sessions
+    Returns dict with sessions or None if not found
+    """
+    try:
+        print(f"🔍 Fetching sessions for user {user_id}...")
+        data = await db.find_one({"_id": user_id})
+        
+        if not data:
+            print("❌ No session data found in database")
+            return None
+
+        # Print complete document for debugging
+        print("📄 Full database document:")
+        print(json.dumps(data, indent=2, default=str))
+
+        # Extract sessions
+        sessions = {
+            "pyro_session": data.get("session"),
+            "telethon_session": data.get("telethon_session_string"),
+            "has_pyro": bool(data.get("session")),
+            "has_telethon": bool(data.get("telethon_session_string"))
+        }
+
+        print("\n🔑 Extracted sessions:")
+        print(f"Pyrogram: {'✅' if sessions['has_pyro'] else '❌'}")
+        print(f"Telethon: {'✅' if sessions['has_telethon'] else '❌'}")
+
+        if sessions['pyro_session']:
+            print(f"\nPyrogram session (first 10 chars): {sessions['pyro_session'][:10]}...")
+        if sessions['telethon_session']:
+            print(f"Telethon session (first 10 chars): {sessions['telethon_session'][:10]}...")
+
+        return sessions
+
+    except Exception as e:
+        print(f"⚠️ Error fetching sessions: {e}")
+        return None
 
 # Function to check if Pyrogram session exists
 async def has_pyro_session(user_id):
