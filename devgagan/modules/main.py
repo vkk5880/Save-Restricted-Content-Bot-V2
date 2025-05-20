@@ -103,7 +103,7 @@ async def process_and_upload_link(userbot, user_id, msg_id, link, retry_count, m
     print("process_and_upload_link method.")
     try:
         await get_msg(userbot, user_id, msg_id, link, retry_count, message)
-        await asyncio.sleep(15)
+        await asyncio.sleep(4)
     finally:
         pass
 
@@ -112,7 +112,7 @@ async def process_and_upload_link_telethon(telethon_userbot, user_id, msg_id, li
     print("process_and_upload_link method_telethon.")
     try:
         await get_msg_telethon(telethon_userbot, user_id, msg_id, link, retry_count, message)
-        await asyncio.sleep(15)
+        await asyncio.sleep(8)
     finally:
         pass
 
@@ -186,7 +186,6 @@ async def single_link(_, message):
         userbot = await initialize_userbot(user_id)
     elif upload_methods == "Telethon":
         telethon_userbot  = await initialize_telethon_userbot(user_id)
-        await asyncio.sleep(15)
     try:
         if await is_normal_tg_link(link):
             # Pass userbot if available; handle normal Telegram links
