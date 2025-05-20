@@ -178,7 +178,7 @@ async def get_msg_telethonok(telethon_userbot, sender, edit_id, msg_link, i, mes
             await progress_message.delete()
             return
 
-        caption = await get_final_caption_telethon(msg, sender)
+        caption = await get_final_caption(msg, sender)
         file = await rename_file(file, sender)
 
         result = None
@@ -342,17 +342,7 @@ def get_message_file_size_telethon(msg):
         return None  # Photos don't have size in Telethon
     return 1
 
-async def get_final_caption_telethon(msg, sender):
-    """Generate final caption with replacements"""
-    original_caption = msg.message if msg.message else ""
-    custom_caption = get_user_caption_preference(sender)
-    final_caption = f"{original_caption}\n\n{custom_caption}" if custom_caption else original_caption
-    replacements = load_replacement_words(sender)
-    
-    for word, replace_word in replacements.items():
-        final_caption = final_caption.replace(word, replace_word)
-        
-    return final_caption if final_caption else None
+
 
 async def download_user_stories_telethon(telethon_userbot, chat_id, msg_id, edit, sender):
     """Download user stories using Telethon (1.40.0+ compatible)"""
@@ -764,20 +754,29 @@ def get_message_file_size(msg):
     return 1
 
 async def get_final_caption(msg, sender):
-    # Handle caption based on the upload method
-    if msg.caption:
+    """
+    Generates the final caption for a message, handling both Pyrogram and Telethon message objects,
+    and applying custom captions and replacements.
+    """
+    original_caption = ""
+    # Check for caption from Pyrogram's Message object (msg.caption)
+    if hasattr(msg, 'caption') and msg.caption:
         original_caption = msg.caption.markdown
-    else:
-        original_caption = ""
-    
+    # Check for caption from Telethon's Message object (msg.message)
+    elif hasattr(msg, 'message') and msg.message:
+        original_caption = msg.message
+
     custom_caption = get_user_caption_preference(sender)
+
+    # Combine original and custom captions
     final_caption = f"{original_caption}\n\n{custom_caption}" if custom_caption else original_caption
+
+    # Apply word replacements
     replacements = load_replacement_words(sender)
     for word, replace_word in replacements.items():
         final_caption = final_caption.replace(word, replace_word)
         
     return final_caption if final_caption else None
-
 
 async def download_user_stories(userbot, chat_id, msg_id, edit, sender):
     try:
