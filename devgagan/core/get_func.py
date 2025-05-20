@@ -28,7 +28,7 @@ from telethon.errors import (
     ChatInvalidError,
     FloodWaitError
 )
-from devgagan.core.fasthelper import fast_upload, fast_download
+from devgagan.core.fasthelper import fast_upload, fast_download, safe_turbo_download
 from telethon import functions, types
 from telethon.tl.types import DocumentAttributeVideo, Message
 from telethon.sessions import StringSession
@@ -168,7 +168,7 @@ async def get_msg_telethon(telethon_userbot, sender, edit_id, msg_link, i, messa
         progress_message = await gf.send_message(sender, "**__Downloading__...**")
 
         try:
-            file = await fast_download(
+            file = await safe_turbo_download(
                 telethon_userbot, msg,
                 reply=progress_message,
                 progress_bar_function=lambda done, total: dl_progress_callback(done, total, sender)
