@@ -471,8 +471,9 @@ async def get_msg_telethon(telethon_userbot, sender, edit_id, msg_link, i, messa
             await app.edit_message_text(sender, edit_id, "**❌ 4GB Uploader not found**")
             return
 
-        edit = await app.edit_message_text(sender, edit_id, "**Downloading...**")
-        progress_message = await app.send_message(sender, "**__Downloading__...__**")
+        #edit = await app.edit_message_text(sender, edit_id, "**Downloading...**")
+        await edit.delete()
+        progress_message = await gf.send_message(sender, "**__Downloading__...__**")
         
         try:
             print("Downloading file...")
@@ -499,7 +500,7 @@ async def get_msg_telethon(telethon_userbot, sender, edit_id, msg_link, i, messa
             await progress_message.delete()
         except Exception as e:
             await progress_message.edit(f"Error downloading with Telethon: {e}")
-            await progress_message.delete()
+            #await progress_message.delete()
             return
             
         caption = await get_final_caption_telethon(msg, sender)
@@ -507,7 +508,7 @@ async def get_msg_telethon(telethon_userbot, sender, edit_id, msg_link, i, messa
         file = await rename_file(temp_file, sender)
 
         # Handle specific media types
-        if isinstance(msg.media, types.MessageMediaPhoto):
+        """if isinstance(msg.media, types.MessageMediaPhoto):
             result = await app.send_photo(target_chat_id, file, caption=caption, reply_to_message_id=topic_id)
         elif isinstance(msg.media, types.MessageMediaDocument):
             # Check for specific document types
@@ -539,7 +540,8 @@ async def get_msg_telethon(telethon_userbot, sender, edit_id, msg_link, i, messa
         # Log the sent message
         if result:
             await result.copy(LOG_GROUP)
-        await edit.delete()
+        await edit.delete()"""
+        await upload_media_telethon(sender, target_chat_id, file, caption, topic_id)
 
     except (ChannelInvalidError, ChannelPrivateError, ChatIdInvalidError, ChatInvalidError) as e:
         logger.error(f"Channel error: {e}")
@@ -753,7 +755,7 @@ async def get_msg_telethonnnnnn(telethon_userbot, sender, edit_id, msg_link, i, 
 
 
 
-async def upload_media_telethon(sender, target_chat_id, file, caption, edit, topic_id):
+async def upload_media_telethon(sender, target_chat_id, file, caption, topic_id):
     try:
         # Get file metadata
         metadata = video_metadata(file)
@@ -765,7 +767,7 @@ async def upload_media_telethon(sender, target_chat_id, file, caption, edit, top
         image_formats = {'jpg', 'png', 'jpeg'}
 
         # Delete the edit message since we'll use our own progress
-        await edit.delete()
+        #await edit.delete()
         progress_message = await gf.send_message(sender, "**__Uploading...__**")
 
         # Upload with floodwait handling
