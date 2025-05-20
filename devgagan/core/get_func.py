@@ -472,7 +472,7 @@ async def get_msg_telethon(telethon_userbot, sender, edit_id, msg_link, i, messa
             return
 
         #edit = await app.edit_message_text(sender, edit_id, "**Downloading...**")
-        await edit.delete()
+        await app.delete_messages(sender, edit_id)
         progress_message = await gf.send_message(sender, "**__Downloading__...__**")
         
         try:
