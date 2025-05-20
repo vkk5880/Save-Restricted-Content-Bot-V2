@@ -28,7 +28,7 @@ from telethon.errors import (
     ChatInvalidError,
     FloodWaitError
 )
-from devgagan.core.parallel_transfer import download_file, upload_file
+from devgagan.core.fasthelper import fast_upload, fast_download
 from telethon import functions, types
 from telethon.tl.types import DocumentAttributeVideo, Message
 from telethon.sessions import StringSession
@@ -40,8 +40,8 @@ from pyrogram.errors import RPCError
 from pyrogram.types import Message
 from config import MONGO_DB as MONGODB_CONNECTION_STRING, LOG_GROUP, OWNER_ID, STRING, API_ID, CONTACT, API_HASH
 from devgagan.core.mongo.db import set_session, remove_session, get_data
-from devgagantools import fast_upload
-from devgagantools import fast_download
+#from devgagantools import fast_upload
+#from devgagantools import fast_download
 from devgagan.core.func import *
 from devgagan.modules.shrink import is_user_verified
 from telethon import TelegramClient, events, Button
@@ -87,7 +87,7 @@ from telethon.errors import (
     ChatInvalidError,
 )
 
-async def get_msg_telethonok(telethon_userbot, sender, edit_id, msg_link, i, message):
+async def get_msg_telethon(telethon_userbot, sender, edit_id, msg_link, i, message):
     """
     Handles message processing using Telethon client.
     """
