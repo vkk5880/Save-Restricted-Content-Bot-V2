@@ -150,11 +150,11 @@ async def get_msg_telethonok(telethon_userbot, sender, edit_id, msg_link, i, mes
 
         if not hasattr(msg, 'media') or msg.media is None or isinstance(msg.media, types.MessageMediaWebPage):
             if msg.text:
-                await clone_message_telethon(app, msg, target_chat_id, topic_id, edit_id, LOG_GROUP)
+                await clone_message(app, msg, target_chat_id, topic_id, edit_id, LOG_GROUP)
             return
 
         if msg.sticker:
-            await handle_sticker_telethon(app, msg, target_chat_id, topic_id, edit_id, LOG_GROUP)
+            await handle_sticker(app, msg, target_chat_id, topic_id, edit_id, LOG_GROUP)
             return
 
         file_size = get_message_file_size_telethon(msg)
@@ -299,29 +299,6 @@ async def upload_media_telethon(sender, target_chat_id, file, caption, topic_id)
         gc.collect()
 
 
-async def clone_message_telethon(app, msg, target_chat_id, topic_id, edit_id, log_group):
-    """Clone message content to target chat"""
-    try:
-        edit = await app.edit_message_text(target_chat_id, edit_id, "Cloning...")
-        devgaganin = await app.send_message(target_chat_id, msg.text, reply_to_message_id=topic_id)
-        await devgaganin.copy(log_group)
-    except Exception as e:
-        logger.error(f"Error cloning message: {e}")
-    finally:
-        if 'edit' in locals():
-            await edit.delete()
-
-async def handle_sticker_telethon(app, msg, target_chat_id, topic_id, edit_id, log_group):
-    """Handle sticker messages"""
-    try:
-        edit = await app.edit_message_text(target_chat_id, edit_id, "Handling sticker...")
-        result = await app.send_sticker(target_chat_id, msg.sticker.id, reply_to_message_id=topic_id)
-        await result.copy(log_group)
-    except Exception as e:
-        logger.error(f"Error handling sticker: {e}")
-    finally:
-        if 'edit' in locals():
-            await edit.delete()
 
 async def get_media_filename_telethon(msg):
     """Get filename from media message"""
@@ -474,21 +451,6 @@ async def copy_message_with_chat_id_telethon(app, telethon_userbot, sender, chat
     finally:
         if file and os.path.exists(file):
             os.remove(file)
-
-async def send_media_message_telethon(app, target_chat_id, msg, caption, topic_id):
-    """Send media message with Telethon"""
-    try:
-        if msg.video:
-            return await app.send_video(target_chat_id, msg.video.file_id, caption=caption, reply_to_message_id=topic_id)
-        if msg.document:
-            return await app.send_document(target_chat_id, msg.document.file_id, caption=caption, reply_to_message_id=topic_id)
-        if msg.photo:
-            return await app.send_photo(target_chat_id, msg.photo.file_id, caption=caption, reply_to_message_id=topic_id)
-    except Exception as e:
-        logger.error(f"Error while sending media: {e}")
-    
-    # Fallback to copy_message in case of any exceptions
-    return await app.copy_message(target_chat_id, msg.chat.id, msg.id, reply_to_message_id=topic_id)
 
 
 async def upload_media(sender, target_chat_id, file, caption, edit, topic_id):
@@ -647,7 +609,7 @@ async def get_msg(userbot, sender, edit_id, msg_link, i, message):
             return
 
         if msg.text:
-            await clone_text_message(app, msg, target_chat_id, topic_id, edit_id, LOG_GROUP)
+            await clone_message(app, msg, target_chat_id, topic_id, edit_id, LOG_GROUP)
             return
 
         if msg.sticker:
@@ -715,24 +677,36 @@ async def get_msg(userbot, sender, edit_id, msg_link, i, message):
         if edit:
             await edit.delete(2)
 
-async def clone_message(app, msg, target_chat_id, topic_id, edit_id, log_group):
-    edit = await app.edit_message_text(target_chat_id, edit_id, "Cloning...")
-    devgaganin = await app.send_message(target_chat_id, msg.text.markdown, reply_to_message_id=topic_id)
-    await devgaganin.copy(log_group)
-    await edit.delete()
 
-async def clone_text_message(app, msg, target_chat_id, topic_id, edit_id, log_group):
+async def clone_message(app, msg, target_chat_id, topic_id, edit_id, log_group):
     edit = await app.edit_message_text(target_chat_id, edit_id, "Cloning text message...")
-    devgaganin = await app.send_message(target_chat_id, msg.text.markdown, reply_to_message_id=topic_id)
+    if msg.text.markdown:
+        devgaganin = await app.send_message(target_chat_id, msg.text.markdown, reply_to_message_id=topic_id)
+    else:
+        devgaganin = await app.send_message(target_chat_id, msg.message , reply_to_message_id=topic_id)
     await devgaganin.copy(log_group)
     await edit.delete()
 
 
 async def handle_sticker(app, msg, target_chat_id, topic_id, edit_id, log_group):
+    """
+    Handles sticker messages, adapting for Telethon and Pyrogram message objects.
+    """
     edit = await app.edit_message_text(target_chat_id, edit_id, "Handling sticker...")
-    result = await app.send_sticker(target_chat_id, msg.sticker.file_id, reply_to_message_id=topic_id)
-    await result.copy(log_group)
-    await edit.delete()
+
+    sticker_id = None
+    if hasattr(msg.sticker, 'id'):  # Telethon
+        sticker_id = msg.sticker.id
+    elif hasattr(msg.sticker, 'file_id'):  # Pyrogram
+        sticker_id = msg.sticker.file_id
+        
+    if sticker_id:
+        result = await app.send_sticker(target_chat_id, sticker_id, reply_to_message_id=topic_id)
+        await result.copy(log_group)
+    else:
+        # Handle cases where sticker ID isn't found (e.g., unexpected message object structure)
+        await edit.edit("Could not retrieve sticker ID.")
+        return
 
 
 async def get_media_filename(msg):
