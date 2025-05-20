@@ -21,6 +21,13 @@ from typing import (
     Union,
 )
 
+from telethon.errors import (
+    ChannelInvalidError, 
+    ChannelPrivateError, 
+    ChatIdInvalidError, 
+    ChatInvalidError,
+    FloodWaitError
+)
 from telethon import TelegramClient, helpers, utils
 from telethon.crypto import AuthKey
 from telethon.network import MTProtoSender
