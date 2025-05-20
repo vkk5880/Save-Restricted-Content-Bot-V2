@@ -47,6 +47,7 @@ from devgagan.modules.shrink import is_user_verified
 from telethon import TelegramClient, events, Button
 from devgagan import app
 from devgagan import telethon_user_client  as gf
+from telethon.tl.types import MessageMediaDocument
 
 
 # Set up logging
