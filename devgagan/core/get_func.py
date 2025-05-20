@@ -163,7 +163,7 @@ async def get_msg_telethon(telethon_userbot, sender, edit_id, msg_link, i, messa
             await app.edit_message_text(sender, edit_id, "**❌ 4GB Uploader not found**")
             return
 
-        edit = await app.edit_message_text(sender, edit_id, "")
+        #edit = await app.edit_message_text(sender, edit_id, "")
         progress_message = await gf.send_message(sender, "**__Downloading__...**")
 
         try:
