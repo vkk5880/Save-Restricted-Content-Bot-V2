@@ -191,7 +191,7 @@ async def get_msg_telethon(telethon_userbot, sender, edit_id, msg_link, i, messa
                 await handle_large_file(file, sender, edit, caption)
             else:
                 # This ensures any remaining media types also use upload_media_telethon
-                result = await upload_media_telethon(sender, target_chat_id, file, caption, edit_id, topic_id)
+                result = await upload_media_telethon(sender, target_chat_id, file, caption, topic_id)
             
 
         if result:
