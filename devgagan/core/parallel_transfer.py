@@ -93,6 +93,9 @@ class DownloadSender:
     last_chunk_time: float
     last_chunk_size: int
     speed_limit: int
+    request_times: list  # Track timestamps of each request
+    total_bytes_transferred: int
+    start_time: float
 
     def __init__(
         self,
@@ -113,6 +116,122 @@ class DownloadSender:
         self.last_chunk_time = time.time()
         self.last_chunk_size = 0
         self.speed_limit = speed_limit
+        self.request_times = []
+        self.total_bytes_transferred = 0
+        self.start_time = time.time()
+        print(f"Initialized DownloadSender with chunk size: {limit/1024:.2f} KB")
+
+    async def next(self) -> Optional[bytes]:
+        if not self.remaining:
+            print("No more chunks remaining")
+            return None
+        
+        # Calculate dynamic throttling
+        current_time = time.time()
+        time_diff = current_time - self.last_chunk_time
+        if time_diff > 0:
+            current_speed = self.last_chunk_size / time_diff if self.last_chunk_size else 0
+            if current_speed > self.speed_limit:
+                wait_time = (self.last_chunk_size / self.speed_limit) - time_diff
+                if wait_time > 0:
+                    print(f"Throttling: Speed {current_speed/1024:.2f} KB/s exceeds limit {self.speed_limit/1024:.2f} KB/s, waiting {wait_time:.2f}s")
+                    await asyncio.sleep(wait_time)
+        
+        try:
+            request_start = time.time()
+            result = await self.client._call(self.sender, self.request)
+            request_end = time.time()
+            
+            chunk_size = len(result.bytes)
+            self.request_times.append(request_start)
+            self.total_bytes_transferred += chunk_size
+            
+            # Log chunk details
+            print(f"Got chunk: {chunk_size/1024:.2f} KB | "
+                     f"Offset: {self.request.offset/1024:.2f} KB | "
+                     f"Remaining: {self.remaining}")
+            
+            # Calculate and log metrics every 5 chunks
+            if len(self.request_times) % 5 == 0:
+                self._log_metrics()
+            
+            self.last_chunk_size = chunk_size
+            self.last_chunk_time = request_end
+            self.remaining -= 1
+            self.request.offset += self.stride
+            
+            return result.bytes
+            
+        except FloodWaitError as e:
+            print(f"Flood wait error, sleeping for {e.seconds} seconds")
+            await asyncio.sleep(e.seconds)
+            return await self.next()
+
+    def _log_metrics(self) -> None:
+        """Log performance metrics periodically"""
+        if not self.request_times:
+            return
+            
+        current_time = time.time()
+        elapsed = current_time - self.start_time
+        
+        # Calculate requests per second (last 10 seconds window)
+        recent_requests = [t for t in self.request_times if t > current_time - 10]
+        rps = len(recent_requests) / 10 if len(recent_requests) > 0 else 0
+        
+        # Calculate average speed
+        avg_speed = self.total_bytes_transferred / elapsed if elapsed > 0 else 0
+        
+        print(
+            f"Transfer stats: "
+            f"Total chunks: {len(self.request_times)} | "
+            f"RPS: {rps:.2f} | "
+            f"Avg speed: {avg_speed/1024:.2f} KB/s | "
+            f"Total data: {self.total_bytes_transferred/1024/1024:.2f} MB"
+        )
+
+    async def disconnect(self) -> None:
+        """Disconnect and log final stats"""
+        await self.sender.disconnect()
+        elapsed = time.time() - self.start_time
+        print(
+            f"Transfer complete: "
+            f"Total chunks: {len(self.request_times)} | "
+            f"Total data: {self.total_bytes_transferred/1024/1024:.2f} MB | "
+            f"Avg speed: {self.total_bytes_transferred/elapsed/1024:.2f} KB/s"
+        )
+
+
+"""class DownloadSender:
+    client: TelegramClient
+    sender: MTProtoSender
+    request: GetFileRequest
+    remaining: int
+    stride: int
+    last_chunk_time: float
+    last_chunk_size: int
+    speed_limit: int
+
+    def __init__(
+        self,
+        client: TelegramClient,
+        sender: MTProtoSender,
+        file: TypeLocation,
+        offset: int,
+        limit: int,
+        stride: int,
+        count: int,
+        speed_limit: int = MAX_DOWNLOAD_SPEED
+    ) -> None:
+        self.sender = sender
+        self.client = client
+        self.request = GetFileRequest(file, offset=offset, limit=limit)
+        self.stride = stride
+        self.remaining = count
+        self.last_chunk_time = time.time()
+        self.last_chunk_size = 0
+        self.speed_limit = speed_limit
+        self.request_times = []  # Track timestamps of each request
 
     async def next(self) -> Optional[bytes]:
         if not self.remaining:
@@ -148,7 +267,7 @@ class DownloadSender:
             #return await self.next()
 
     def disconnect(self) -> Awaitable[None]:
-        return self.sender.disconnect()
+        return self.sender.disconnect()"""
 
 
 class UploadSender:
@@ -254,6 +373,7 @@ class ParallelTransferrer:
         self.speed_limit = speed_limit
         self.last_speed_check = time.time()
         self.bytes_transferred_since_check = 0
+        self.total_requests = 0
 
     async def _cleanup(self) -> None:
         await asyncio.gather(*[sender.disconnect() for sender in self.senders])
@@ -306,6 +426,9 @@ class ParallelTransferrer:
     ) -> DownloadSender:
         # Adjust chunk size based on speed limit
         adjusted_part_size = max(MIN_CHUNK_SIZE, min(part_size, MAX_CHUNK_SIZE))
+        self.total_requests += 1
+        print(f"Total requests so far: {self.total_requests}")
+        print(f"adjusted_part_size so far: {adjusted_part_size}")
         return DownloadSender(
             self.client,
             await self._create_sender(),
@@ -409,6 +532,7 @@ class ParallelTransferrer:
     ) -> AsyncGenerator[bytes, None]:
         connection_count = connection_count or self._get_connection_count(file_size)
         part_size = (part_size_kb or utils.get_appropriated_part_size(file_size)) * 1024
+        print(f"Calculated chunk size: {part_size / 1024} KB")  # Log dynamic chunk size
         part_count = math.ceil(file_size / part_size)
         await self._init_download(connection_count, file, part_count, part_size)
 
