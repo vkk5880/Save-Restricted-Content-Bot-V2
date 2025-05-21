@@ -26,9 +26,7 @@ import sys
 import telethon.network
 from telethon.network import connection
 from telethon import TelegramClient, connection
-from telethon.network.connection import Connection
 
-_loggers_instance = Connection._Connection__Loggers()
 DC4_IP = "149.154.167.91"  # Telegram's DC4 IPv4
 # Override default DC list (DC4 first)
 telethon.network.connection.DEFAULT_DC = 4  # Force DC4 globally
@@ -43,7 +41,11 @@ logging.basicConfig(
     stream=sys.stdout # Direct log output to standard output
 )
 
+from telethon.extensions import BinaryReader
 
+class CustomLogger:
+    def __init__(self):
+        self.logger = logging.getLogger('custom.telethon')
 
 botStartTime = time.time()
 
@@ -62,7 +64,7 @@ telethon_user_client = TelegramClient('telethon_user_client',
                                       API_ID, API_HASH,
                                       connection=connection.ConnectionTcpFull(ip=DC4_IP, port=443,
                                                                               dc_id=4,  # Explicit DC4
-                                                                              loggers=_loggers_instance, # Pass the required loggers instance
+                                                                              loggers=CustomLogger(), # Pass the required loggers instance
                                                                              )
                                      ).start(bot_token=BOT_TOKEN)
 
