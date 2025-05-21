@@ -259,6 +259,80 @@ async def initialize_telethon_userbot(user_id):
 
         # 3. Start connection with verification
         try:
+            # Modified start - don't use interactive auth
+            await telethon_userbot.connect()
+            
+            # Verify authorization first before DC switching
+            if not await telethon_userbot.is_user_authorized():
+                logger.error("Session invalid - not authorized")
+                await telethon_userbot.disconnect()
+                await db.remove_telethon_session(user_id)
+                return None
+
+            # Optional: DC switching logic
+            original_dc = telethon_userbot.session.dc_id
+            logger.info(f"Original DC: {original_dc}")
+            
+            if original_dc != 4:  # Only switch if not already on DC4
+                await telethon_userbot.disconnect()
+                await telethon_userbot._switch_dc(4)  # Europe
+                await telethon_userbot.connect()
+                logger.info(f"New DC: {telethon_userbot.session.dc_id}")
+
+            # Verify active connection
+            if not telethon_userbot.is_connected():
+                logger.error("Not connected after startup")
+                await telethon_userbot.disconnect()
+                return None
+
+            # Test API call
+            try:
+                me = await telethon_userbot.get_me()
+                logger.info(f"Successfully started as @{me.username}")
+                return telethon_userbot
+            except Exception as api_error:
+                logger.error(f"API test failed: {str(api_error)}")
+                await telethon_userbot.disconnect()
+                return None
+
+        except (ConnectionError, asyncio.TimeoutError) as e:
+            logger.error(f"Connection failed: {str(e)}")
+            return None
+        except AuthKeyError as e:
+            logger.error(f"Invalid auth key: {str(e)}")
+            await db.remove_telethon_session(user_id)
+            return None
+
+    except Exception as e:
+        logger.error(f"Unexpected error: {str(e)}", exc_info=True)
+        return None
+
+
+
+
+async def initialize_telethon_userbotvk(user_id):
+    """
+    Initialize and verify Telethon userbot with complete status checking
+    Returns: TelegramClient instance or None if initialization fails
+    """
+    try:
+        # 1. Get session from DB
+        sessions = await db.get_sessions(user_id)
+        if not sessions or not sessions.get("telethon_session"):
+            logger.warning(f"No Telethon session found for user {user_id}")
+            return None
+
+        # 2. Create client instance
+        telethon_userbot = TelegramClient(
+            session=StringSession(sessions["telethon_session"]),
+            api_id=API_ID,
+            api_hash=API_HASH,
+            device_model="iPhone 16 Pro",
+            system_version="13.3.1"
+        )
+
+        # 3. Start connection with verification
+        try:
             await telethon_userbot.start()
             print(f"Original DC: {telethon_userbot.session.dc_id}")
             await telethon_userbot.disconnect()
