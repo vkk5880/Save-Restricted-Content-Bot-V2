@@ -56,13 +56,14 @@ from telethon.tl.types import (
 
 # Transfer control configuration
 MAX_DOWNLOAD_SPEEDS = int(getenv("MAX_DOWNLOAD_SPEED", "15"))
-MAX_CHUNK_SIZES = int(getenv("MAX_CHUNK_SIZE", "512"))
+MAX_CHUNK_SIZES = int(getenv("MAX_CHUNK_SIZE", "3072"))
+MIN_CHUNK_SIZES = int(getenv("MIN_CHUNK_SIZE", "512"))
 SPEED_CHECK_INTERVALS = int(getenv("SPEED_CHECK_INTERVAL", "1"))
 MAX_PARALLEL_TRANSFERS = int(getenv("MAX_PARALLEL_TRANSFERS", "4"))  # Maximum number of simultaneous file transfers
 MAX_CONNECTIONS_PER_TRANSFER = int(getenv("MAX_CONNECTIONS_PER_TRANSFER", "5"))  # Maximum connections per file transfer
 
 MAX_DOWNLOAD_SPEED = MAX_DOWNLOAD_SPEEDS * 1024 * 1024  # 15 Mbps in bytes (adjustable)
-MIN_CHUNK_SIZE = 64 * 1024  # 64KB
+MIN_CHUNK_SIZE = MIN_CHUNK_SIZES * 1024  # 64KB
 MAX_CHUNK_SIZE = MAX_CHUNK_SIZES * 1024  # 512KB
 FLOOD_WAIT_SLEEP = 5  # Seconds to sleep on flood wait error
 SPEED_CHECK_INTERVAL = SPEED_CHECK_INTERVALS  # Seconds between speed checks
