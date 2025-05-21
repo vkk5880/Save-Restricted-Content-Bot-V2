@@ -30,6 +30,8 @@ logging.basicConfig(
     stream=sys.stdout # Direct log output to standard output
 )
 
+botStartTime = time.time()
+
 app = Client(
     ":RestrictBot:",
     api_id=API_ID,
