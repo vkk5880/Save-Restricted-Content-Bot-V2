@@ -41,14 +41,6 @@ logging.basicConfig(
     stream=sys.stdout # Direct log output to standard output
 )
 
-from telethon.extensions import BinaryReader
-
-class CustomLogger:
-    def __init__(self):
-        self.logger = logging.getLogger('custom.telethon')
-
-botStartTime = time.time()
-
 app = Client(
     ":RestrictBot:",
     api_id=API_ID,
@@ -64,7 +56,7 @@ telethon_user_client = TelegramClient('telethon_user_client',
                                       API_ID, API_HASH,
                                       connection=connection.ConnectionTcpFull(ip=DC4_IP, port=443,
                                                                               dc_id=4,  # Explicit DC4
-                                                                              loggers=CustomLogger(), # Pass the required loggers instance
+                                                                              loggers=logging.getLogger() # Pass the required loggers instance
                                                                              )
                                      ).start(bot_token=BOT_TOKEN)
 
