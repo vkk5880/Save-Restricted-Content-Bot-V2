@@ -343,18 +343,12 @@ async def initialize_telethon_userbot(user_id):
 
         # 2. Create client instance
         telethon_userbot = TelegramClient(
-            session=StringSession(sessions["telethon_session"]),
+            session=None,  # No session yet
+            #session=StringSession(sessions["telethon_session"]),
             api_id=API_ID,
             api_hash=API_HASH,
             device_model="iPhone 16 Pro",
-            system_version="13.3.1",
-            connection=connection.ConnectionTcpFull(
-            ip=DC4_IP,
-            port=443,
-            dc_id=4,
-            loggers=_loggers_instance, # Pass the required loggers instance
-                
-            )
+            system_version="13.3.1"
         )
 
         # 3. Start connection with verification
@@ -362,9 +356,11 @@ async def initialize_telethon_userbot(user_id):
             await telethon_userbot.start()
             print(f"Original DC: {telethon_userbot.session.dc_id}")
             #await telethon_userbot.disconnect()
-            #await telethon_userbot._switch_dc(4)  # Europe
-            #print(f"New DC: {telethon_userbot.session.dc_id}")
+            await telethon_userbot._switch_dc(4)  # Europe
+            print(f"New DC: {telethon_userbot.session.dc_id}")
             #await telethon_userbot.start()
+            telethon_userbot.session = StringSession(sessions["telethon_session"])
+            await telethon_userbot.connect()  # Reconnect with the session
             #await telethon_userbot.get_me()  # Test API call
             # 4. Verify active connection
             if not telethon_userbot.is_connected():
