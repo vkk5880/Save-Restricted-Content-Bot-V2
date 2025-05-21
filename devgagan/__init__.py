@@ -25,7 +25,9 @@ import sys
 
 import telethon.network
 from telethon.network import connection
+from telethon import TelegramClient, connection
 
+DC4_IP = "149.154.167.91"  # Telegram's DC4 IPv4
 # Override default DC list (DC4 first)
 telethon.network.connection.DEFAULT_DC = 4  # Force DC4 globally
 
@@ -54,7 +56,12 @@ app = Client(
 
 pro = Client("ggbot", api_id=API_ID, api_hash=API_HASH, session_string=STRING,  workers=80, max_concurrent_transmissions=80)
 
-telethon_user_client = TelegramClient('sexrepo', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
+telethon_user_client = TelegramClient('telethon_user_client',
+                                      API_ID, API_HASH,
+                                      connection=connection.ConnectionTcpFull(ip_addr=DC4_IP, port=443,
+                                                                              dc_id=4,  # Explicit DC4
+                                                                             )
+                                     ).start(bot_token=BOT_TOKEN)
 
 
 # MongoDB setup
