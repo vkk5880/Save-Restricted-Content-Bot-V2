@@ -80,14 +80,6 @@ async def telethon_login_handler(client, message):
             API_HASH
         )
         await telethon_client.connect()
-
-        current_dc = telethon_client.session.dc_id
-        if current_dc != 4:
-            logger.info(f"Original DC: {current_dc}")
-            #await telethon_client.disconnect()
-            await telethon_client._switch_dc(4)  # Switch to DC4
-            #await telethon_client.connect()
-            logger.info(f"New DC: {telethon_client.session.dc_id}")
         
         sent_code = await telethon_client.send_code_request(phone_number)
         
