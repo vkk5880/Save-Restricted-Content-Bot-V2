@@ -47,7 +47,9 @@ from telethon.errors import (
 )
 import asyncio
 from telethon import TelegramClient, connection
+from telethon.network.connection import Connection
 
+_loggers_instance = Connection._Connection__Loggers()
 DC4_IP = "149.154.167.91"  # Telegram's DC4 IPv4
 '''
 from devgagan.modules.connect_user import (
@@ -349,7 +351,9 @@ async def initialize_telethon_userbot(user_id):
             connection=connection.ConnectionTcpFull(
             ip=DC4_IP,
             port=443,
-            dc_id=4,# Explicit DC4
+            dc_id=4,
+            loggers=_loggers_instance, # Pass the required loggers instance
+                
             )
         )
 
