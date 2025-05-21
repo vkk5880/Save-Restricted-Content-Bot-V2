@@ -38,9 +38,9 @@ logging.basicConfig(
 )
 
 botStartTime = time.time()
-
+#name=pyrogram_session_path,
 app = Client(
-    name=pyrogram_session_path,
+    ":RestrictBot:",
     api_id=API_ID,
     api_hash=API_HASH,
     bot_token=BOT_TOKEN,
@@ -54,9 +54,9 @@ pro = Client("ggbot", api_id=API_ID, api_hash=API_HASH, session_string=STRING,  
 
 
 telethon_user_client = TelegramClient(
-    session=telethon_session_file_path,
-    api_id=API_ID, # Pass these as keyword arguments too for clarity and consistency
-    api_hash=API_HASH, # Pass these as keyword arguments too
+    'sexrepo',
+    api_id=API_ID,
+    api_hash=API_HASH,
 )
 
 
@@ -94,8 +94,8 @@ async def restrict_bot():
     await app.start()
     await telethon_user_client.start(bot_token=BOT_TOKEN)
     print(f"Original DC: {telethon_user_client.session.dc_id}")
-    await telethon_user_client._switch_dc(4)  # Switch to DC4
-    print(f"New DC: {telethon_user_client.session.dc_id}")
+    #await telethon_user_client._switch_dc(4)  # Switch to DC4
+    #print(f"New DC: {telethon_user_client.session.dc_id}")
     getme = await app.get_me()
     BOT_ID = getme.id
     BOT_USERNAME = getme.username
