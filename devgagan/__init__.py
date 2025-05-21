@@ -22,21 +22,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import time
 import sys
 
-
-import telethon.network
-from telethon.network import connection
-from telethon import TelegramClient, connection
-
-DC4_IP = "149.154.167.91"  # Telegram's DC4 IPv4
-# Override default DC list (DC4 first)
-telethon.network.connection.DEFAULT_DC = 4  # Force DC4 globally
-
-
 loop = asyncio.get_event_loop()
-class TelethonLoggerAdapter:
- def __getitem__(self, name):
-  return logging.getLogger(name)
-
 
 logging.basicConfig(
     format='[%(levelname)s/%(asctime)s] %(name)s: %(message)s',  
