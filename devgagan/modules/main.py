@@ -236,6 +236,7 @@ async def single_link(_, message):
 # Initialize logger at module level
 logger = logging.getLogger(__name__)
 
+
 async def initialize_telethon_userbot(user_id):
     """
     Initialize and verify Telethon userbot with complete status checking
@@ -259,39 +260,54 @@ async def initialize_telethon_userbot(user_id):
 
         # 3. Start connection with verification
         try:
-            # Modified start - don't use interactive auth
+            # First connection attempt without DC switching
             await telethon_userbot.connect()
             
-            # Verify authorization first before DC switching
+            # Immediate authorization check
             if not await telethon_userbot.is_user_authorized():
                 logger.error("Session invalid - not authorized")
                 await telethon_userbot.disconnect()
                 await db.remove_telethon_session(user_id)
                 return None
 
-            # Optional: DC switching logic
-            original_dc = telethon_userbot.session.dc_id
-            logger.info(f"Original DC: {original_dc}")
-            
-            if original_dc != 4:  # Only switch if not already on DC4
+            # Get initial account info before DC switching
+            try:
+                me = await telethon_userbot.get_me()
+                if not me:
+                    logger.error("Account info could not be retrieved")
+                    await telethon_userbot.disconnect()
+                    await db.remove_telethon_session(user_id)
+                    return None
+            except Exception as e:
+                logger.error(f"Initial account check failed: {str(e)}")
                 await telethon_userbot.disconnect()
-                await telethon_userbot._switch_dc(4)  # Europe
+                await db.remove_telethon_session(user_id)
+                return None
+
+            # Optional DC switching (only if needed)
+            current_dc = telethon_userbot.session.dc_id
+            if current_dc != 4:
+                logger.info(f"Original DC: {current_dc}")
+                await telethon_userbot.disconnect()
+                await telethon_userbot._switch_dc(4)  # Switch to DC4
                 await telethon_userbot.connect()
                 logger.info(f"New DC: {telethon_userbot.session.dc_id}")
 
-            # Verify active connection
-            if not telethon_userbot.is_connected():
-                logger.error("Not connected after startup")
-                await telethon_userbot.disconnect()
-                return None
+                # Re-check authorization after DC switch
+                if not await telethon_userbot.is_user_authorized():
+                    logger.error("Authorization lost after DC switch")
+                    await telethon_userbot.disconnect()
+                    return None
 
-            # Test API call
+            # Final verification
             try:
                 me = await telethon_userbot.get_me()
-                logger.info(f"Successfully started as @{me.username}")
+                logger.info(f"Successfully started as {me.id}")
+                if hasattr(me, 'username'):
+                    logger.info(f"Username: @{me.username}")
                 return telethon_userbot
-            except Exception as api_error:
-                logger.error(f"API test failed: {str(api_error)}")
+            except Exception as e:
+                logger.error(f"Final verification failed: {str(e)}")
                 await telethon_userbot.disconnect()
                 return None
 
@@ -306,8 +322,6 @@ async def initialize_telethon_userbot(user_id):
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}", exc_info=True)
         return None
-
-
 
 
 async def initialize_telethon_userbotvk(user_id):
