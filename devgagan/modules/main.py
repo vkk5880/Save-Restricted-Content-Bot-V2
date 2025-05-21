@@ -237,7 +237,7 @@ async def single_link(_, message):
 logger = logging.getLogger(__name__)
 
 
-async def initialize_telethon_userbot(user_id):
+async def initialize_telethon_userbotkk(user_id):
     """
     Initialize and verify Telethon userbot with complete status checking
     Returns: TelegramClient instance or None if initialization fails
@@ -324,7 +324,7 @@ async def initialize_telethon_userbot(user_id):
         return None
 
 
-async def initialize_telethon_userbotvk(user_id):
+async def initialize_telethon_userbot(user_id):
     """
     Initialize and verify Telethon userbot with complete status checking
     Returns: TelegramClient instance or None if initialization fails
@@ -349,10 +349,10 @@ async def initialize_telethon_userbotvk(user_id):
         try:
             await telethon_userbot.start()
             print(f"Original DC: {telethon_userbot.session.dc_id}")
-            await telethon_userbot.disconnect()
-            await telethon_userbot._switch_dc(4)  # Europe
-            print(f"New DC: {telethon_userbot.session.dc_id}")
-            await telethon_userbot.start()
+            #await telethon_userbot.disconnect()
+            #await telethon_userbot._switch_dc(4)  # Europe
+            #print(f"New DC: {telethon_userbot.session.dc_id}")
+            #await telethon_userbot.start()
             #await telethon_userbot.get_me()  # Test API call
             # 4. Verify active connection
             if not telethon_userbot.is_connected():
