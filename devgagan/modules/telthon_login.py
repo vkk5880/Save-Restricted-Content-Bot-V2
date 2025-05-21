@@ -80,7 +80,7 @@ async def telethon_login_handler(client, message):
             API_ID, 
             API_HASH,
             connection=connection.ConnectionTcpFull(
-                ip_addr=DC4_IP,
+                ip=DC4_IP,
                 port=443,
                 dc_id=4,  # Explicit DC4
             )
