@@ -56,13 +56,17 @@ app = Client(
 pro = Client("ggbot", api_id=API_ID, api_hash=API_HASH, session_string=STRING,  workers=80, max_concurrent_transmissions=80)
 
 telethon_user_client = TelegramClient('telethon_user_client',
-                                      API_ID, API_HASH,
-                                      connection=connection.ConnectionTcpFull(ip=DC4_IP, port=443,
-                                                                              dc_id=4,  # Explicit DC4
-                                                                              loggers=TelethonLoggerAdapter() # Pass the required loggers instance
-                                                                             )
+                                      API_ID, API_HASH
                                      ).start(bot_token=BOT_TOKEN)
 
+
+current_dc = telethon_user_client.session.dc_id
+if current_dc != 4:
+ logger.info(f"Original DC: {current_dc}")
+ await telethon_user_client.disconnect()
+ await telethon_user_client._switch_dc(4)  # Switch to DC4
+ await telethon_user_client.connect()
+ logger.info(f"New DC: {telethon_user_client.session.dc_id}")
 
 # MongoDB setup
 tclient = AsyncIOMotorClient(MONGO_DB)
