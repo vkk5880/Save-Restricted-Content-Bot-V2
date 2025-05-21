@@ -21,6 +21,7 @@ from telethon.sync import TelegramClient
 from motor.motor_asyncio import AsyncIOMotorClient
 import time
 import sys
+import os
 
 SESSION_DIR = "data/sessions"
 os.makedirs(SESSION_DIR, exist_ok=True) # Create the directory if it doesn't exist
