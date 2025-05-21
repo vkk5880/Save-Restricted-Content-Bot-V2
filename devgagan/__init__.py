@@ -33,7 +33,10 @@ telethon.network.connection.DEFAULT_DC = 4  # Force DC4 globally
 
 
 loop = asyncio.get_event_loop()
- 
+ class TelethonLoggerAdapter:
+    def __getitem__(self, name):
+        return logging.getLogger(name)
+
 
 logging.basicConfig(
     format='[%(levelname)s/%(asctime)s] %(name)s: %(message)s',  
@@ -56,7 +59,7 @@ telethon_user_client = TelegramClient('telethon_user_client',
                                       API_ID, API_HASH,
                                       connection=connection.ConnectionTcpFull(ip=DC4_IP, port=443,
                                                                               dc_id=4,  # Explicit DC4
-                                                                              loggers=logging.getLogger() # Pass the required loggers instance
+                                                                              loggers=TelethonLoggerAdapter() # Pass the required loggers instance
                                                                              )
                                      ).start(bot_token=BOT_TOKEN)
 
