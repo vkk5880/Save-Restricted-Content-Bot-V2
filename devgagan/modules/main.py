@@ -47,9 +47,6 @@ from telethon.errors import (
 )
 import asyncio
 from telethon import TelegramClient, connection
-from telethon.network.connection import Connection
-
-_loggers_instance = Connection._Connection__Loggers()
 DC4_IP = "149.154.167.91"  # Telegram's DC4 IPv4
 '''
 from devgagan.modules.connect_user import (
@@ -242,91 +239,6 @@ async def single_link(_, message):
 logger = logging.getLogger(__name__)
 
 
-async def initialize_telethon_userbotkk(user_id):
-    """
-    Initialize and verify Telethon userbot with complete status checking
-    Returns: TelegramClient instance or None if initialization fails
-    """
-    try:
-        # 1. Get session from DB
-        sessions = await db.get_sessions(user_id)
-        if not sessions or not sessions.get("telethon_session"):
-            logger.warning(f"No Telethon session found for user {user_id}")
-            return None
-
-        # 2. Create client instance
-        telethon_userbot = TelegramClient(
-            session=StringSession(sessions["telethon_session"]),
-            api_id=API_ID,
-            api_hash=API_HASH,
-            device_model="iPhone 16 Pro",
-            system_version="13.3.1"
-        )
-
-        # 3. Start connection with verification
-        try:
-            # First connection attempt without DC switching
-            await telethon_userbot.connect()
-            
-            # Immediate authorization check
-            if not await telethon_userbot.is_user_authorized():
-                logger.error("Session invalid - not authorized")
-                await telethon_userbot.disconnect()
-                await db.remove_telethon_session(user_id)
-                return None
-
-            # Get initial account info before DC switching
-            try:
-                me = await telethon_userbot.get_me()
-                if not me:
-                    logger.error("Account info could not be retrieved")
-                    await telethon_userbot.disconnect()
-                    await db.remove_telethon_session(user_id)
-                    return None
-            except Exception as e:
-                logger.error(f"Initial account check failed: {str(e)}")
-                await telethon_userbot.disconnect()
-                await db.remove_telethon_session(user_id)
-                return None
-
-            # Optional DC switching (only if needed)
-            current_dc = telethon_userbot.session.dc_id
-            if current_dc != 4:
-                logger.info(f"Original DC: {current_dc}")
-                await telethon_userbot.disconnect()
-                await telethon_userbot._switch_dc(4)  # Switch to DC4
-                await telethon_userbot.connect()
-                logger.info(f"New DC: {telethon_userbot.session.dc_id}")
-
-                # Re-check authorization after DC switch
-                if not await telethon_userbot.is_user_authorized():
-                    logger.error("Authorization lost after DC switch")
-                    await telethon_userbot.disconnect()
-                    return None
-
-            # Final verification
-            try:
-                me = await telethon_userbot.get_me()
-                logger.info(f"Successfully started as {me.id}")
-                if hasattr(me, 'username'):
-                    logger.info(f"Username: @{me.username}")
-                return telethon_userbot
-            except Exception as e:
-                logger.error(f"Final verification failed: {str(e)}")
-                await telethon_userbot.disconnect()
-                return None
-
-        except (ConnectionError, asyncio.TimeoutError) as e:
-            logger.error(f"Connection failed: {str(e)}")
-            return None
-        except AuthKeyError as e:
-            logger.error(f"Invalid auth key: {str(e)}")
-            await db.remove_telethon_session(user_id)
-            return None
-
-    except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}", exc_info=True)
-        return None
 
 
 async def initialize_telethon_userbot(user_id):
