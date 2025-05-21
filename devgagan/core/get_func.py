@@ -209,7 +209,7 @@ async def get_msg_telethon(telethon_userbot, sender, edit_id, msg_link, i, messa
             await result.copy(LOG_GROUP)
         
         # Ensure edit is deleted if it was created
-        if edit:
+        #if edit:
             #await edit.delete()
 
     except (ChannelInvalidError, ChannelPrivateError, ChatIdInvalidError, ChatInvalidError) as e:
