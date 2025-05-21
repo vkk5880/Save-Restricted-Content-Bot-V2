@@ -186,7 +186,7 @@ async def get_msg_telethon(telethon_userbot, sender, edit_id, msg_link, i, messa
         if isinstance(msg.media, types.MessageMediaPhoto):
             result = await app.send_photo(target_chat_id, file, caption=caption, reply_to_message_id=topic_id)
 
-        elif isinstance(msg.media, MessageMediaDocument):
+        """elif isinstance(msg.media, MessageMediaDocument):
             if hasattr(msg.media.document, 'attributes'):
                 is_voice = any(
                     isinstance(attr, types.DocumentAttributeAudio) and attr.voice
@@ -195,7 +195,7 @@ async def get_msg_telethon(telethon_userbot, sender, edit_id, msg_link, i, messa
                 if is_voice:
                     result = await app.send_voice(target_chat_id, file, reply_to_message_id=topic_id)
                 else:
-                   result = await app.send_audio(target_chat_id, file, caption=caption, reply_to_message_id=topic_id)
+                   result = await app.send_audio(target_chat_id, file, caption=caption, reply_to_message_id=topic_id)"""
         else:
             # Fallback for other media types or if file size exceeds limit
             if file_size and file_size > size_limit:
@@ -226,6 +226,7 @@ async def get_msg_telethon(telethon_userbot, sender, edit_id, msg_link, i, messa
 
 async def upload_media_telethon(sender, target_chat_id, file, caption, topic_id):
     try:
+        print("UPLOADING MEDIA TELETHON")
         # Get file metadata
         metadata = video_metadata(file)
         width, height, duration = metadata['width'], metadata['height'], metadata['duration']
