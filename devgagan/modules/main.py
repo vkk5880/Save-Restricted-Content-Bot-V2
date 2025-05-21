@@ -46,7 +46,6 @@ from telethon.errors import (
     AuthKeyDuplicatedError
 )
 import asyncio
-from telethon.session import DataCenter
 
 
 
@@ -249,9 +248,6 @@ async def initialize_telethon_userbot(user_id):
     Returns: TelegramClient instance or None if initialization fails
     """
     try:
-        dc_id = 2
-        dc_ipv4_address = '149.154.167.91' # Example IP for DC 2 test server
-        dc_port = 443 # Standard Telegram port
         # 1. Get session from DB
         sessions = await db.get_sessions(user_id)
         if not sessions or not sessions.get("telethon_session"):
@@ -260,13 +256,11 @@ async def initialize_telethon_userbot(user_id):
 
         # 2. Create client instance
         telethon_userbot = TelegramClient(
-            session=None,  # No session yet
-            #session=StringSession(sessions["telethon_session"]),
+            session=StringSession(sessions["telethon_session"]),
             api_id=API_ID,
             api_hash=API_HASH,
             device_model="iPhone 16 Pro",
             system_version="13.3.1",
-            datacenter=DataCenter(id=dc_id, ipv4_addr=dc_ipv4_address, port=dc_port)
         )
 
         # 3. Start connection with verification
@@ -274,11 +268,11 @@ async def initialize_telethon_userbot(user_id):
             await telethon_userbot.start()
             print(f"Original DC: {telethon_userbot.session.dc_id}")
             #await telethon_userbot.disconnect()
-            await telethon_userbot._switch_dc(4)  # Europe
-            print(f"New DC: {telethon_userbot.session.dc_id}")
+            #await telethon_userbot._switch_dc(4)  # Europe
+            #print(f"New DC: {telethon_userbot.session.dc_id}")
             #await telethon_userbot.start()
-            telethon_userbot.session = StringSession(sessions["telethon_session"])
-            await telethon_userbot.connect()  # Reconnect with the session
+            #telethon_userbot.session = StringSession(sessions["telethon_session"])
+            #await telethon_userbot.connect()  # Reconnect with the session
             #await telethon_userbot.get_me()  # Test API call
             # 4. Verify active connection
             if not telethon_userbot.is_connected():
