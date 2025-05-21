@@ -22,6 +22,14 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import time
 import sys
 
+
+import telethon.network
+from telethon.network import connection
+
+# Override default DC list (DC4 first)
+telethon.network.connection.DEFAULT_DC = 4  # Force DC4 globally
+
+
 loop = asyncio.get_event_loop()
  
 
