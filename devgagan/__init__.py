@@ -49,12 +49,19 @@ app = Client(
 
 pro = Client("ggbot", api_id=API_ID, api_hash=API_HASH, session_string=STRING,  workers=80, max_concurrent_transmissions=80)
 
-telethon_user_client = TelegramClient(session=telethon_session_file_path, API_ID, API_HASH).start(bot_token=BOT_TOKEN)
+#telethon_user_client = TelegramClient(session=telethon_session_file_path, API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 
 
-current_dc = telethon_user_client.session.dc_id
-if current_dc != 4:
- print(f"Original DC: {current_dc}")
+telethon_user_client = TelegramClient(
+    session=telethon_session_file_path,
+    api_id=API_ID, # Pass these as keyword arguments too for clarity and consistency
+    api_hash=API_HASH, # Pass these as keyword arguments too
+)
+
+
+#current_dc = telethon_user_client.session.dc_id
+#if current_dc != 4:
+ #print(f"Original DC: {current_dc}")
  #await telethon_user_client.disconnect()
  #await telethon_user_client._switch_dc(4)  # Switch to DC4
  #await telethon_user_client.connect()
@@ -73,8 +80,7 @@ async def create_ttl_index():
 async def setup_database():
  await create_ttl_index()
  print("MongoDB TTL index created.")
- await telethon_user_client._switch_dc(4)  # Switch to DC4
- print(f"New DC: {telethon_user_client.session.dc_id}")
+ 
  
 
 
@@ -85,6 +91,10 @@ async def restrict_bot():
     global BOT_ID, BOT_NAME, BOT_USERNAME
     await setup_database()
     await app.start()
+    await telethon_user_client.start(bot_token=BOT_TOKEN)
+    print(f"Original DC: {telethon_user_client.session.dc_id}")
+    await telethon_user_client._switch_dc(4)  # Switch to DC4
+    print(f"New DC: {telethon_user_client.session.dc_id}")
     getme = await app.get_me()
     BOT_ID = getme.id
     BOT_USERNAME = getme.username
