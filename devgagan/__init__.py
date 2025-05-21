@@ -33,9 +33,9 @@ telethon.network.connection.DEFAULT_DC = 4  # Force DC4 globally
 
 
 loop = asyncio.get_event_loop()
- class TelethonLoggerAdapter:
-    def __getitem__(self, name):
-        return logging.getLogger(name)
+class TelethonLoggerAdapter:
+ def __getitem__(self, name):
+  return logging.getLogger(name)
 
 
 logging.basicConfig(
