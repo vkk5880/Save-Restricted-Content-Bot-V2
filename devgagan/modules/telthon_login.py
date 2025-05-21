@@ -21,7 +21,9 @@ from config import API_ID, API_HASH, OWNER_ID
 from devgagan.core.mongo import db
 from devgagan.core.func import subscribe
 import logging
+from telethon import TelegramClient, connection
 
+DC4_IP = "149.154.167.91"  # Telegram's DC4 IPv4
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -76,7 +78,12 @@ async def telethon_login_handler(client, message):
         telethon_client = TelegramClient(
             f"telethon_session_{user_id}", 
             API_ID, 
-            API_HASH
+            API_HASH,
+            connection=connection.ConnectionTcpFull(
+                ip_addr=DC4_IP,
+                port=443,
+                dc_id=4,  # Explicit DC4
+            )
         )
         await telethon_client.connect()
         
