@@ -46,6 +46,9 @@ from telethon.errors import (
     AuthKeyDuplicatedError
 )
 import asyncio
+from telethon import TelegramClient, connection
+
+DC4_IP = "149.154.167.91"  # Telegram's DC4 IPv4
 '''
 from devgagan.modules.connect_user import (
     connect_user, 
@@ -343,6 +346,11 @@ async def initialize_telethon_userbot(user_id):
             api_hash=API_HASH,
             device_model="iPhone 16 Pro",
             system_version="13.3.1"
+            connection=connection.ConnectionTcpFull(
+            ip_addr=DC4_IP,
+            port=443,
+            dc_id=4,# Explicit DC4
+            ),
         )
 
         # 3. Start connection with verification
