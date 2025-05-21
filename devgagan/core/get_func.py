@@ -173,10 +173,10 @@ async def get_msg_telethon(telethon_userbot, sender, edit_id, msg_link, i, messa
                 reply=progress_message,
                 progress_bar_function=lambda done, total: dl_progress_callback(done, total, sender)
             )
-            await progress_message.delete()
+            #await progress_message.delete()
         except Exception as e:
             await progress_message.edit(f"Error downloading with Telethon: {e}")
-            await progress_message.delete()
+            #await progress_message.delete()
             return
 
         caption = await get_final_caption(msg, sender)
@@ -210,7 +210,7 @@ async def get_msg_telethon(telethon_userbot, sender, edit_id, msg_link, i, messa
         
         # Ensure edit is deleted if it was created
         if edit:
-            await edit.delete()
+            #await edit.delete()
 
     except (ChannelInvalidError, ChannelPrivateError, ChatIdInvalidError, ChatInvalidError) as e:
         logger.error(f"Channel error: {e}")
@@ -221,7 +221,7 @@ async def get_msg_telethon(telethon_userbot, sender, edit_id, msg_link, i, messa
         if file and os.path.exists(file):
             os.remove(file)
         if edit and hasattr(edit, 'delete'): 
-            await edit.delete()
+            #await edit.delete()
 
 
 async def upload_media_telethon(sender, target_chat_id, file, caption, topic_id):
