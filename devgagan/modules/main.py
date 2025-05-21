@@ -260,7 +260,11 @@ async def initialize_telethon_userbot(user_id):
         # 3. Start connection with verification
         try:
             await telethon_userbot.start()
-            await client._switch_dc(4)
+            print(f"Original DC: {telethon_userbot.session.dc_id}")
+            await telethon_userbot.disconnect()
+            await telethon_userbot._switch_dc(4)  # Europe
+            print(f"New DC: {telethon_userbot.session.dc_id}")
+            #await telethon_userbot.get_me()  # Test API call
             # 4. Verify active connection
             if not telethon_userbot.is_connected():
                 logger.error("Start completed but not actually connected")
