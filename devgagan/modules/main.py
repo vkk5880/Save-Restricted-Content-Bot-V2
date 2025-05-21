@@ -46,8 +46,10 @@ from telethon.errors import (
     AuthKeyDuplicatedError
 )
 import asyncio
-from telethon import TelegramClient, connection
-DC4_IP = "149.154.167.91"  # Telegram's DC4 IPv4
+from telethon.session import DataCenter
+
+
+
 '''
 from devgagan.modules.connect_user import (
     connect_user, 
@@ -247,6 +249,9 @@ async def initialize_telethon_userbot(user_id):
     Returns: TelegramClient instance or None if initialization fails
     """
     try:
+        dc_id = 2
+        dc_ipv4_address = '149.154.167.91' # Example IP for DC 2 test server
+        dc_port = 443 # Standard Telegram port
         # 1. Get session from DB
         sessions = await db.get_sessions(user_id)
         if not sessions or not sessions.get("telethon_session"):
@@ -260,7 +265,8 @@ async def initialize_telethon_userbot(user_id):
             api_id=API_ID,
             api_hash=API_HASH,
             device_model="iPhone 16 Pro",
-            system_version="13.3.1"
+            system_version="13.3.1",
+            datacenter=DataCenter(id=dc_id, ipv4_addr=dc_ipv4_address, port=dc_port)
         )
 
         # 3. Start connection with verification
