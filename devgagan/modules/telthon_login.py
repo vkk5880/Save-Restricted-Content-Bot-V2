@@ -21,12 +21,16 @@ from config import API_ID, API_HASH, OWNER_ID
 from devgagan.core.mongo import db
 from devgagan.core.func import subscribe
 import logging
-from telethon import TelegramClient, connection
+from telethon import TelegramClient, connection 
+from telethon.network.connection import Connection
+
+_loggers_instance = Connection._Connection__Loggers()
 
 DC4_IP = "149.154.167.91"  # Telegram's DC4 IPv4
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 async def check_pyrogram_login(user_id):
     """Check if user has Pyrogram login"""
@@ -83,6 +87,7 @@ async def telethon_login_handler(client, message):
                 ip=DC4_IP,
                 port=443,
                 dc_id=4,  # Explicit DC4
+                loggers=_loggers_instance, # Pass the required loggers instance
             )
         )
         await telethon_client.connect()
