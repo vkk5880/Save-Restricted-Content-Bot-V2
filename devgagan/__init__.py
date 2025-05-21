@@ -39,7 +39,7 @@ logging.basicConfig(
 botStartTime = time.time()
 
 app = Client(
-    name=pyrogram_session_path, #":RestrictBot:",
+    name=pyrogram_session_path,
     api_id=API_ID,
     api_hash=API_HASH,
     bot_token=BOT_TOKEN,
@@ -49,9 +49,7 @@ app = Client(
 
 pro = Client("ggbot", api_id=API_ID, api_hash=API_HASH, session_string=STRING,  workers=80, max_concurrent_transmissions=80)
 
-telethon_user_client = TelegramClient(session=telethon_session_file_path, # Provide the file path'telethon_user_client'
-                                      API_ID, API_HASH
-                                     ).start(bot_token=BOT_TOKEN)
+telethon_user_client = TelegramClient(session=telethon_session_file_path, API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 
 
 current_dc = telethon_user_client.session.dc_id
