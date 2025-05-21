@@ -347,7 +347,7 @@ async def initialize_telethon_userbot(user_id):
             device_model="iPhone 16 Pro",
             system_version="13.3.1",
             connection=connection.ConnectionTcpFull(
-            ip_addr=DC4_IP,
+            ip=DC4_IP,
             port=443,
             dc_id=4,# Explicit DC4
             )
