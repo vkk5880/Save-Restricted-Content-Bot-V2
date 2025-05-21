@@ -22,6 +22,12 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import time
 import sys
 
+SESSION_DIR = "data/sessions"
+os.makedirs(SESSION_DIR, exist_ok=True) # Create the directory if it doesn't exist
+
+pyrogram_session_path = os.path.join(SESSION_DIR, "my_pyrogram_bot")
+telethon_session_file_path = os.path.join(SESSION_DIR, "my_telethon_user")
+
 loop = asyncio.get_event_loop()
 
 logging.basicConfig(
@@ -33,7 +39,7 @@ logging.basicConfig(
 botStartTime = time.time()
 
 app = Client(
-    ":RestrictBot:",
+    name=pyrogram_session_path, #":RestrictBot:",
     api_id=API_ID,
     api_hash=API_HASH,
     bot_token=BOT_TOKEN,
@@ -43,7 +49,7 @@ app = Client(
 
 pro = Client("ggbot", api_id=API_ID, api_hash=API_HASH, session_string=STRING,  workers=80, max_concurrent_transmissions=80)
 
-telethon_user_client = TelegramClient('telethon_user_client',
+telethon_user_client = TelegramClient(session=telethon_session_file_path, # Provide the file path'telethon_user_client'
                                       API_ID, API_HASH
                                      ).start(bot_token=BOT_TOKEN)
 
