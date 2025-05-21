@@ -220,7 +220,7 @@ async def get_msg_telethon(telethon_userbot, sender, edit_id, msg_link, i, messa
     finally:
         if file and os.path.exists(file):
             os.remove(file)
-        if edit and hasattr(edit, 'delete'): 
+        #if edit and hasattr(edit, 'delete'): 
             #await edit.delete()
 
 
