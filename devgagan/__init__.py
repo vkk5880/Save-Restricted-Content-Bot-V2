@@ -63,9 +63,9 @@ telethon_user_client = TelegramClient('telethon_user_client',
 current_dc = telethon_user_client.session.dc_id
 if current_dc != 4:
  logger.info(f"Original DC: {current_dc}")
- await telethon_user_client.disconnect()
+ #await telethon_user_client.disconnect()
  await telethon_user_client._switch_dc(4)  # Switch to DC4
- await telethon_user_client.connect()
+ #await telethon_user_client.connect()
  logger.info(f"New DC: {telethon_user_client.session.dc_id}")
 
 # MongoDB setup
