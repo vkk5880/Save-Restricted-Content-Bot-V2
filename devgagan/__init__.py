@@ -64,9 +64,9 @@ current_dc = telethon_user_client.session.dc_id
 if current_dc != 4:
  logger.info(f"Original DC: {current_dc}")
  #await telethon_user_client.disconnect()
- await telethon_user_client._switch_dc(4)  # Switch to DC4
+ #await telethon_user_client._switch_dc(4)  # Switch to DC4
  #await telethon_user_client.connect()
- logger.info(f"New DC: {telethon_user_client.session.dc_id}")
+ #logger.info(f"New DC: {telethon_user_client.session.dc_id}")
 
 # MongoDB setup
 tclient = AsyncIOMotorClient(MONGO_DB)
@@ -79,8 +79,13 @@ async def create_ttl_index():
 
 # Run the TTL index creation when the bot starts
 async def setup_database():
-    await create_ttl_index()
-    print("MongoDB TTL index created.")
+ await create_ttl_index()
+ print("MongoDB TTL index created.")
+ await telethon_user_client._switch_dc(4)  # Switch to DC4
+ logger.info(f"New DC: {telethon_user_client.session.dc_id}")
+ 
+
+
 
 # You can call this in your main bot file before starting the bot
 
