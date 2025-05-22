@@ -393,83 +393,107 @@ class ParallelTransferrer:
             logger.info("Download completed successfully")
 
 
+async def _internal_transfer_to_telegram(client: TelegramClient, response: BinaryIO, progress_callback: callable) -> Tuple[TypeInputFile, int]:
+    logger.info(f"Starting internal transfer of file: {response.name}")
+    file_id = helpers.generate_random_long()
+    file_size = os.path.getsize(response.name)
+    hash_md5 = hashlib.md5()
 
+    try:
+        async with parallel_transfer_semaphore:
+            uploader = ParallelTransferrer(client)
+            part_size, part_count, is_large = await uploader.init_upload(file_id, file_size)
+            buffer = bytearray()
+            
+            logger.info(f"File size: {file_size} bytes, Part size: {part_size}, Parts: {part_count}, Large: {is_large}")
 
+            for data in stream_file(response):
+                if progress_callback:
+                    try:
+                        r = progress_callback(response.tell(), file_size)
+                        if inspect.isawaitable(r):
+                            await r
+                    except Exception as e:
+                        logger.error(f"Progress callback error: {str(e)}")
 
+                if not is_large:
+                    hash_md5.update(data)
 
+                if len(buffer) == 0 and len(data) == part_size:
+                    logger.debug(f"Uploading full chunk of {len(data)} bytes")
+                    await uploader.upload(data)
+                    continue
+                    
+                new_len = len(buffer) + len(data)
+                if new_len >= part_size:
+                    cutoff = part_size - len(buffer)
+                    buffer.extend(data[:cutoff])
+                    logger.debug(f"Uploading buffered chunk of {len(buffer)} bytes")
+                    await uploader.upload(bytes(buffer))
+                    buffer.clear()
+                    buffer.extend(data[cutoff:])
+                else:
+                    buffer.extend(data)
+                    logger.debug(f"Buffering {len(data)} bytes (total buffer: {len(buffer)})")
+                    
+            if len(buffer) > 0:
+                logger.debug(f"Uploading final chunk of {len(buffer)} bytes")
+                await uploader.upload(bytes(buffer))
+            
+            await uploader.finish_upload()
+            logger.info("File upload completed successfully")
 
+    except Exception as e:
+        logger.error(f"Upload failed: {str(e)}")
+        await uploader._cleanup()
+        raise
 
+    return (
+        (InputFileBig(file_id, part_count, filename), 
+        file_size
+    ) if is_large else (
+        InputFile(file_id, part_count, filename, hash_md5.hexdigest()),
+        file_size
+    )
 
-def stream_file(file_to_stream: BinaryIO, chunk_size=1024):
+def stream_file(file_to_stream: BinaryIO, chunk_size=1024) -> Generator[bytes, None, None]:
+    logger.debug(f"Starting to stream file {file_to_stream.name}")
     while True:
         data_read = file_to_stream.read(chunk_size)
         if not data_read:
+            logger.debug("End of file stream reached")
             break
         yield data_read
 
+async def cleanup_connections():
+    logger.info("Performing global connection cleanup")
+    tasks = [
+        t for t in asyncio.all_tasks()
+        if t.get_name().startswith('Task-') and '_send_loop' in str(t.get_coro())
+    ]
+    for task in tasks:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+    logger.info(f"Cancelled {len(tasks)} pending tasks")
 
-async def _internal_transfer_to_telegram(client: TelegramClient, response: BinaryIO, progress_callback: callable) -> Tuple[TypeInputFile, int]:
-    file_id = helpers.generate_random_long()
-    file_size = os.path.getsize(response.name)
+def format_bytes(size: int) -> str:
+    power = 2**10
+    n = 0
+    power_labels = {0: 'B', 1: 'KB', 2: 'MB', 3: 'GB'}
+    while size > power and n <= len(power_labels):
+        size /= power
+        n += 1
+    return f"{size:.2f} {power_labels[n]}"
 
-    hash_md5 = hashlib.md5()
-    async with parallel_transfer_semaphore:
-        uploader = ParallelTransferrer(client)
-        part_size, part_count, is_large = await uploader.init_upload(file_id, file_size)
-        buffer = bytearray()
-        
-        for data in stream_file(response):
-            if progress_callback:
-                r = progress_callback(response.tell(), file_size)
-                if inspect.isawaitable(r):
-                    await r
-            
-            if not is_large:
-                hash_md5.update(data)
-            
-            if len(buffer) == 0 and len(data) == part_size:
-                await uploader.upload(data)
-                continue
-                
-            new_len = len(buffer) + len(data)
-            if new_len >= part_size:
-                cutoff = part_size - len(buffer)
-                buffer.extend(data[:cutoff])
-                await uploader.upload(bytes(buffer))
-                buffer.clear()
-                buffer.extend(data[cutoff:])
-            else:
-                buffer.extend(data)
-                
-        if len(buffer) > 0:
-            await uploader.upload(bytes(buffer))
-            
-        await uploader.finish_upload()
-        
-    return (InputFileBig(file_id, part_count, filename), file_size) if is_large else (InputFile(file_id, part_count, filename, hash_md5.hexdigest()), file_size)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+async def log_transfer_stats():
+    while True:
+        await asyncio.sleep(60)
+        logger.info("Memory usage: " + format_bytes(os.getpid().memory_info().rss))
+        tasks = len(asyncio.all_tasks())
+        logger.info(f"Active tasks: {tasks}")
 
 
 async def download_file(client: TelegramClient, location: TypeLocation, out: BinaryIO, progress_callback: callable = None, speed_limit: int = MAX_DOWNLOAD_SPEED) -> BinaryIO:
@@ -497,4 +521,6 @@ async def upload_file(client: TelegramClient, file: BinaryIO, name: str, progres
     logger.info(f"Starting file upload: {name}")
     return (await _internal_transfer_to_telegram(client, file, progress_callback))[0]
 
-# ... [Rest of the code remains same as original, but with added logging] ...
+
+# Start background monitoring
+asyncio.create_task(log_transfer_stats())
