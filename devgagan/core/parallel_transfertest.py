@@ -345,7 +345,7 @@ class ParallelTransferrer:
                 for i in range(1, min(connections, MAX_CONNECTIONS_PER_TRANSFER))
             ]))
 
-            log.info(f"Initialized {len(self.senders)} senders with {part_size/1024} KB chunks")
+            logger.info(f"Initialized {len(self.senders)} senders with {part_size/1024} KB chunks")
         except Exception as e:
             await self._cleanup()
             raise
