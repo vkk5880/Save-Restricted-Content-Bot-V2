@@ -22,3 +22,4 @@ yt-dlp
 speedtest-cli
 uvloop
 telegram-session-converter
+psutil
