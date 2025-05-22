@@ -448,13 +448,12 @@ async def _internal_transfer_to_telegram(client: TelegramClient, response: Binar
         await uploader._cleanup()
         raise
 
-    return (
-        (InputFileBig(file_id, part_count, filename), 
-        file_size
-    ) if is_large else (
-        InputFile(file_id, part_count, filename, hash_md5.hexdigest()),
-        file_size
-    )
+    if is_large:
+        return InputFileBig(file_id, part_count, filename), file_size
+    else:
+        return InputFile(file_id, part_count, filename, hash_md5.hexdigest()), file_size
+
+
 
 def stream_file(file_to_stream: BinaryIO, chunk_size=1024) -> Generator[bytes, None, None]:
     logger.debug(f"Starting to stream file {file_to_stream.name}")
