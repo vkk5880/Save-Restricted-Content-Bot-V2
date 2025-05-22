@@ -9,6 +9,7 @@ import inspect
 import logging
 import math
 import os
+import psutil
 import time
 from collections import defaultdict
 from os import getenv
@@ -488,10 +489,20 @@ def format_bytes(size: int) -> str:
         n += 1
     return f"{size:.2f} {power_labels[n]}"
 
+
+
 async def log_transfer_stats():
+    # Get the current process object once, outside the loop for efficiency
+    process = psutil.Process(os.getpid())
     while True:
-        await asyncio.sleep(60)
-        logger.info("Memory usage: " + format_bytes(os.getpid().memory_info().rss))
+        await asyncio.sleep(60) # Wait for 60 seconds
+        try:
+            # Use the process object to get memory info
+            memory_info = process.memory_info()
+            logger.info("Memory usage: " + format_bytes(memory_info.rss))
+        except Exception as e:
+            logger.error(f"Error getting memory info: {e}")
+
         tasks = len(asyncio.all_tasks())
         logger.info(f"Active tasks: {tasks}")
 
