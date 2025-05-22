@@ -12,6 +12,7 @@ import os
 import time
 from collections import defaultdict
 from os import getenv
+from typing import Generator
 from typing import (
     AsyncGenerator,
     Awaitable,
