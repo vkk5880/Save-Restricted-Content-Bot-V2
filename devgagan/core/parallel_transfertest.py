@@ -308,6 +308,83 @@ class ParallelTransferrer:
             return min(max_count, MAX_CONNECTIONS_PER_TRANSFER)
         return min(math.ceil((file_size / full_size) * max_count), MAX_CONNECTIONS_PER_TRANSFER)
 
+
+    async def _init_download(self, connections: int, file: TypeLocation, part_count: int, part_size: int) -> None:
+        # Validate inputs
+        if connections <= 0 or part_size <= 0:
+            raise ValueError("Connections and part_size must be positive")
+
+        # Ensure valid chunk size
+        part_size = max(MIN_CHUNK_SIZE, min(part_size, MAX_CHUNK_SIZE))
+        part_size = (part_size // 1024) * 1024  # Round to nearest KB
+
+        minimum, remainder = divmod(part_count, connections)
+
+        def get_part_count() -> int:
+            nonlocal remainder
+            if remainder > 0:
+                remainder -= 1
+                return minimum + 1
+            return minimum
+
+        try:
+            # Create first sender (handles auth export if cross-DC)
+            first_sender = await self._create_download_sender(
+                file, 0, part_size, connections * part_size, get_part_count(), self.speed_limit
+            )
+            self.senders = [first_sender]
+
+            # Create remaining senders
+            remaining_parts = part_count - (part_count // connections)
+            self.senders.extend(await asyncio.gather(*[
+                self._create_download_sender(
+                    file, i, part_size, connections * part_size,
+                    part_count // connections + (1 if i < remaining_parts else 0),
+                    self.speed_limit
+                )
+                for i in range(1, min(connections, MAX_CONNECTIONS_PER_TRANSFER))
+            ]))
+
+            log.info(f"Initialized {len(self.senders)} senders with {part_size/1024} KB chunks")
+        except Exception as e:
+            await self._cleanup()
+            raise
+
+
+    async def _create_download_sender(self, file: TypeLocation, index: int, part_size: int, stride: int, part_count: int, speed_limit: int) -> DownloadSender:
+        return DownloadSender(
+            self.client,
+            await self._create_sender(),
+            file,
+            index * part_size,
+            part_size,
+            stride,
+            part_count,
+            speed_limit
+        )
+
+    async def _init_upload(self, connections: int, file_id: int, part_count: int, big: bool) -> None:
+        self.senders = [
+            await self._create_upload_sender(file_id, part_count, big, 0, connections, self.speed_limit),
+            *await asyncio.gather(*[
+                self._create_upload_sender(file_id, part_count, big, i, connections, self.speed_limit)
+                for i in range(1, min(connections, MAX_CONNECTIONS_PER_TRANSFER))
+            ])
+        ]
+
+    async def _create_upload_sender(self, file_id: int, part_count: int, big: bool, index: int, stride: int, speed_limit: int) -> UploadSender:
+        return UploadSender(
+            self.client,
+            await self._create_sender(),
+            file_id,
+            part_count,
+            big,
+            index,
+            stride,
+            loop=self.loop,
+            speed_limit=speed_limit
+        )
+
     async def _create_sender_for_dc(self, dc_id: int) -> MTProtoSender:
         logger.info(f"Creating new sender for DC {dc_id}")
         self.dc_id = dc_id
@@ -348,6 +425,35 @@ class ParallelTransferrer:
                 self._active_connections -= 1
             logger.error(f"Error creating sender: {str(e)}")
             raise
+
+
+
+    async def init_upload(self, file_id: int, file_size: int, part_size_kb: Optional[float] = None, connection_count: Optional[int] = None) -> Tuple[int, int, bool]:
+        connection_count = connection_count or self._get_connection_count(file_size)
+        part_size = (part_size_kb or utils.get_appropriated_part_size(file_size)) * 1024
+        part_count = (file_size + part_size - 1) // part_size
+        is_large = file_size > 10 * 1024 * 1024
+        await self._init_upload(connection_count, file_id, part_count, is_large)
+        return part_size, part_count, is_large
+
+    async def upload(self, part: bytes) -> None:
+        current_time = time.time()
+        if current_time - self.last_speed_check > SPEED_CHECK_INTERVAL:
+            speed = self.bytes_transferred_since_check / (current_time - self.last_speed_check)
+            if speed > self.speed_limit:
+                wait_time = (self.bytes_transferred_since_check / self.speed_limit) - (current_time - self.last_speed_check)
+                if wait_time > 0:
+                    await asyncio.sleep(wait_time)
+            
+            self.last_speed_check = time.time()
+            self.bytes_transferred_since_check = 0
+        
+        self.bytes_transferred_since_check += len(part)
+        await self.senders[self.upload_ticker].next(part)
+        self.upload_ticker = (self.upload_ticker + 1) % len(self.senders)
+
+    async def finish_upload(self) -> None:
+        await self._cleanup()
 
     async def download(self, file: TypeLocation, file_size: int, part_size_kb: Optional[float] = None, connection_count: Optional[int] = None) -> AsyncGenerator[bytes, None]:
         logger.info(f"Starting download of {file_size} bytes")
