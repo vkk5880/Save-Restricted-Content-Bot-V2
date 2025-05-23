@@ -191,8 +191,8 @@ class DownloadSender:
                 f"Remaining: {self.remaining}"
                 )
                 
-                if len(self.request_times) % 5 == 0:
-                    self._log_metrics()
+            if len(self.request_times) % 5 == 0:
+                self._log_metrics()
                     
             self.last_chunk_size = chunk_size
             self.last_chunk_time = request_end
