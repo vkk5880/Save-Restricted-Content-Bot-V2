@@ -13,17 +13,7 @@ import psutil
 import time
 from collections import defaultdict
 from os import getenv
-from typing import Generator
-from typing import (
-    AsyncGenerator,
-    Awaitable,
-    BinaryIO,
-    DefaultDict,
-    List,
-    Optional,
-    Tuple,
-    Union,
-)
+from typing import Generator, AsyncGenerator, Awaitable, BinaryIO, DefaultDict, List, Optional, Tuple, Union
 
 from telethon import TelegramClient, helpers, utils
 from telethon.crypto import AuthKey
@@ -38,15 +28,8 @@ from telethon.errors import (
 from telethon.network import MTProtoSender
 from telethon.tl.alltlobjects import LAYER
 from telethon.tl.functions import InvokeWithLayerRequest
-from telethon.tl.functions.auth import (
-    ExportAuthorizationRequest,
-    ImportAuthorizationRequest,
-)
-from telethon.tl.functions.upload import (
-    GetFileRequest,
-    SaveBigFilePartRequest,
-    SaveFilePartRequest,
-)
+from telethon.tl.functions.auth import ExportAuthorizationRequest, ImportAuthorizationRequest
+from telethon.tl.functions.upload import GetFileRequest, SaveBigFilePartRequest, SaveFilePartRequest
 from telethon.tl.types import (
     Document,
     InputDocumentFileLocation,
@@ -83,7 +66,6 @@ MIN_CHUNK_SIZE = MIN_CHUNK_SIZES * 1024  # 128KB
 MAX_CHUNK_SIZE = MAX_CHUNK_SIZES * 1024  # 3072KB
 SPEED_CHECK_INTERVAL = SPEED_CHECK_INTERVALS  # Seconds between speed checks
 
-filename = ""
 parallel_transfer_semaphore = asyncio.Semaphore(MAX_PARALLEL_TRANSFERS)
 parallel_transfer_locks = defaultdict(lambda: asyncio.Lock())
 
@@ -98,6 +80,7 @@ TypeLocation = Union[
 class DownloadSender:
     def __init__(
         self,
+        transferrer: 'ParallelTransferrer',
         client: TelegramClient,
         sender: MTProtoSender,
         file: TypeLocation,
@@ -107,6 +90,7 @@ class DownloadSender:
         count: int,
         speed_limit: int = MAX_DOWNLOAD_SPEED
     ) -> None:
+        self.transferrer = transferrer
         self.client = client
         self.sender = sender
         self.file = file
@@ -127,7 +111,6 @@ class DownloadSender:
             return None
         
         try:
-            # Throttling logic
             current_time = time.time()
             time_diff = current_time - self.last_chunk_time
             if time_diff > 0:
@@ -169,7 +152,7 @@ class DownloadSender:
         except FileMigrateError as e:
             logger.info(f"File migrated to DC {e.new_dc}, reconnecting...")
             await self.sender.disconnect()
-            self.sender = await self.client.transfer._create_sender_for_dc(e.new_dc)
+            self.sender = await self.transferrer._create_sender_for_dc(e.new_dc)
             self.request.offset = 0  # Reset offset for new DC
             return await self.next()
         except Exception as e:
@@ -308,15 +291,9 @@ class ParallelTransferrer:
             return min(max_count, MAX_CONNECTIONS_PER_TRANSFER)
         return min(math.ceil((file_size / full_size) * max_count), MAX_CONNECTIONS_PER_TRANSFER)
 
-
     async def _init_download(self, connections: int, file: TypeLocation, part_count: int, part_size: int) -> None:
-        # Validate inputs
-        if connections <= 0 or part_size <= 0:
-            raise ValueError("Connections and part_size must be positive")
-
-        # Ensure valid chunk size
         part_size = max(MIN_CHUNK_SIZE, min(part_size, MAX_CHUNK_SIZE))
-        part_size = (part_size // 1024) * 1024  # Round to nearest KB
+        part_size = (part_size // 1024) * 1024
 
         minimum, remainder = divmod(part_count, connections)
 
@@ -328,13 +305,11 @@ class ParallelTransferrer:
             return minimum
 
         try:
-            # Create first sender (handles auth export if cross-DC)
             first_sender = await self._create_download_sender(
                 file, 0, part_size, connections * part_size, get_part_count(), self.speed_limit
             )
             self.senders = [first_sender]
 
-            # Create remaining senders
             remaining_parts = part_count - (part_count // connections)
             self.senders.extend(await asyncio.gather(*[
                 self._create_download_sender(
@@ -344,15 +319,14 @@ class ParallelTransferrer:
                 )
                 for i in range(1, min(connections, MAX_CONNECTIONS_PER_TRANSFER))
             ]))
-
             logger.info(f"Initialized {len(self.senders)} senders with {part_size/1024} KB chunks")
         except Exception as e:
             await self._cleanup()
             raise
 
-
     async def _create_download_sender(self, file: TypeLocation, index: int, part_size: int, stride: int, part_count: int, speed_limit: int) -> DownloadSender:
         return DownloadSender(
+            self,
             self.client,
             await self._create_sender(),
             file,
@@ -388,7 +362,7 @@ class ParallelTransferrer:
     async def _create_sender_for_dc(self, dc_id: int) -> MTProtoSender:
         logger.info(f"Creating new sender for DC {dc_id}")
         self.dc_id = dc_id
-        self.auth_key = None  # Force re-authentication
+        self.auth_key = None
         return await self._create_sender()
 
     async def _create_sender(self) -> MTProtoSender:
@@ -426,8 +400,6 @@ class ParallelTransferrer:
             logger.error(f"Error creating sender: {str(e)}")
             raise
 
-
-
     async def init_upload(self, file_id: int, file_size: int, part_size_kb: Optional[float] = None, connection_count: Optional[int] = None) -> Tuple[int, int, bool]:
         connection_count = connection_count or self._get_connection_count(file_size)
         part_size = (part_size_kb or utils.get_appropriated_part_size(file_size)) * 1024
@@ -462,10 +434,6 @@ class ParallelTransferrer:
         part_size = max(MIN_CHUNK_SIZE, min(part_size, MAX_CHUNK_SIZE))
         part_size = (part_size // 1024) * 1024
         
-        if file_size < part_size:
-            part_size = file_size
-        
-        logger.debug(f"Final calculated chunk size: {part_size / 1024:.2f} KB")
         part_count = math.ceil(file_size / part_size)
         
         await self._init_download(connection_count, file, part_count, part_size)
@@ -500,9 +468,8 @@ class ParallelTransferrer:
             await self._cleanup()
             logger.info("Download completed successfully")
 
-
-async def _internal_transfer_to_telegram(client: TelegramClient, response: BinaryIO, progress_callback: callable) -> Tuple[TypeInputFile, int]:
-    logger.info(f"Starting internal transfer of file: {response.name}")
+async def _internal_transfer_to_telegram(client: TelegramClient, response: BinaryIO, filename: str, progress_callback: callable) -> Tuple[TypeInputFile, int]:
+    logger.info(f"Starting internal transfer of file: {filename}")
     file_id = helpers.generate_random_long()
     file_size = os.path.getsize(response.name)
     hash_md5 = hashlib.md5()
@@ -561,8 +528,6 @@ async def _internal_transfer_to_telegram(client: TelegramClient, response: Binar
     else:
         return InputFile(file_id, part_count, filename, hash_md5.hexdigest()), file_size
 
-
-
 def stream_file(file_to_stream: BinaryIO, chunk_size=1024) -> Generator[bytes, None, None]:
     logger.debug(f"Starting to stream file {file_to_stream.name}")
     while True:
@@ -595,15 +560,11 @@ def format_bytes(size: int) -> str:
         n += 1
     return f"{size:.2f} {power_labels[n]}"
 
-
-
 async def log_transfer_stats():
-    # Get the current process object once, outside the loop for efficiency
     process = psutil.Process(os.getpid())
     while True:
-        await asyncio.sleep(60) # Wait for 60 seconds
+        await asyncio.sleep(60)
         try:
-            # Use the process object to get memory info
             memory_info = process.memory_info()
             logger.info("Memory usage: " + format_bytes(memory_info.rss))
         except Exception as e:
@@ -611,7 +572,6 @@ async def log_transfer_stats():
 
         tasks = len(asyncio.all_tasks())
         logger.info(f"Active tasks: {tasks}")
-
 
 async def download_file(client: TelegramClient, location: TypeLocation, out: BinaryIO, progress_callback: callable = None, speed_limit: int = MAX_DOWNLOAD_SPEED) -> BinaryIO:
     logger.info(f"Starting file download to {out.name}")
@@ -633,11 +593,8 @@ async def download_file(client: TelegramClient, location: TypeLocation, out: Bin
     return out
 
 async def upload_file(client: TelegramClient, file: BinaryIO, name: str, progress_callback: callable = None, speed_limit: int = MAX_DOWNLOAD_SPEED) -> TypeInputFile:
-    global filename
-    filename = name
     logger.info(f"Starting file upload: {name}")
-    return (await _internal_transfer_to_telegram(client, file, progress_callback))[0]
-
+    return (await _internal_transfer_to_telegram(client, file, name, progress_callback))[0]
 
 # Start background monitoring
 asyncio.create_task(log_transfer_stats())
