@@ -177,30 +177,29 @@ class DownloadSender:
                     if wait_time > 0:
                         logger.debug(f"Throttling: Speed {current_speed/1024:.2f} KB/s exceeds limit {self.speed_limit/1024:.2f} KB/s, waiting {wait_time:.2f}s")
                         await asyncio.sleep(wait_time)
-
-        request_start = time.time()
-        result = await self.client._call(self.sender, self.request)
-        request_end = time.time()
-        
-        chunk_size = len(result.bytes)
-        self.request_times.append(request_start)
-        self.total_bytes_transferred += chunk_size
-        
-        logger.debug(
-            f"Got chunk: {chunk_size/1024:.2f} KB | "
-            f"Offset: {self.request.offset/1024:.2f} KB | "
-            f"Remaining: {self.remaining}"
-        )
-        
-        if len(self.request_times) % 5 == 0:
-            self._log_metrics()
-        
-        self.last_chunk_size = chunk_size
-        self.last_chunk_time = request_end
-        self.remaining -= 1
-        self.request.offset += self.stride
-        
-        return result.bytes
+                        
+            request_start = time.time()
+            result = await self.client._call(self.sender, self.request)
+            request_end = time.time()
+            chunk_size = len(result.bytes)
+            self.request_times.append(request_start)
+            self.total_bytes_transferred += chunk_size
+            
+            logger.debug(
+                f"Got chunk: {chunk_size/1024:.2f} KB | "
+                f"Offset: {self.request.offset/1024:.2f} KB | "
+                f"Remaining: {self.remaining}"
+                )
+                
+                if len(self.request_times) % 5 == 0:
+                    self._log_metrics()
+                    
+            self.last_chunk_size = chunk_size
+            self.last_chunk_time = request_end
+            self.remaining -= 1
+            self.request.offset += self.stride
+            
+            return result.bytes
         except FloodWaitError as e:
             logger.warning(f"Flood wait error, sleeping for {e.seconds} seconds")
             await asyncio.sleep(e.seconds)
@@ -220,6 +219,7 @@ class DownloadSender:
             logger.error(f"Unexpected error in DownloadSender: {str(e)}")
             await self.disconnect()
             raise
+
 
 
     def _log_metrics(self) -> None:
