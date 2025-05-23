@@ -105,7 +105,7 @@ class DownloadSender:
         self.start_time = time.time()
         logger.debug(f"Initialized DownloadSender with chunk size: {limit/1024:.2f} KB")
 
-    async def next(self) -> Optional[bytes]:
+    """async def next(self) -> Optional[bytes]:
         if not self.remaining:
             logger.debug("No more chunks remaining")
             return None
@@ -158,7 +158,65 @@ class DownloadSender:
         except Exception as e:
             logger.error(f"Unexpected error in DownloadSender: {str(e)}")
             await self.disconnect()
-            raise
+            raise"""
+
+    async def next(self) -> Optional[bytes]:
+    if not self.remaining:
+        logger.debug("No more chunks remaining")
+        return None
+    
+    try:
+        current_time = time.time()
+        time_diff = current_time - self.last_chunk_time
+        if time_diff > 0:
+            current_speed = self.last_chunk_size / time_diff if self.last_chunk_size else 0
+            if current_speed > self.speed_limit:
+                wait_time = (self.last_chunk_size / self.speed_limit) - time_diff
+                if wait_time > 0:
+                    logger.debug(f"Throttling: Speed {current_speed/1024:.2f} KB/s exceeds limit {self.speed_limit/1024:.2f} KB/s, waiting {wait_time:.2f}s")
+                    await asyncio.sleep(wait_time)
+
+        request_start = time.time()
+        result = await self.client._call(self.sender, self.request)
+        request_end = time.time()
+        
+        chunk_size = len(result.bytes)
+        self.request_times.append(request_start)
+        self.total_bytes_transferred += chunk_size
+        
+        logger.debug(
+            f"Got chunk: {chunk_size/1024:.2f} KB | "
+            f"Offset: {self.request.offset/1024:.2f} KB | "
+            f"Remaining: {self.remaining}"
+        )
+        
+        if len(self.request_times) % 5 == 0:
+            self._log_metrics()
+        
+        self.last_chunk_size = chunk_size
+        self.last_chunk_time = request_end
+        self.remaining -= 1
+        self.request.offset += self.stride
+        
+        return result.bytes
+        
+    except FloodWaitError as e:
+        logger.warning(f"Flood wait error, sleeping for {e.seconds} seconds")
+        await asyncio.sleep(e.seconds)
+        return await self.next()
+    except FileMigrateError as e:
+        logger.info(f"File migrated to DC {e.new_dc}, reconnecting...")
+        await self.sender.disconnect()
+        # Fix: Properly decrement active connections
+        async with self.transferrer._connection_lock:
+            self.transferrer._active_connections -= 1
+        self.sender = await self.transferrer._create_sender_for_dc(e.new_dc)
+        self.request.offset = 0
+        return await self.next()
+    except Exception as e:
+        logger.error(f"Unexpected error in DownloadSender: {str(e)}")
+        await self.disconnect()
+        raise
 
     def _log_metrics(self) -> None:
         if not self.request_times:
