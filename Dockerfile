@@ -7,7 +7,7 @@ RUN python3 -m pip install --upgrade pip
 COPY requirements.txt .
 
 RUN pip3 install wheel
-RUN pip3 install -U -r requirements.txt
+RUN pip3 install --no-cache-dir -U -r requirements.txt
 WORKDIR /app
 COPY . .
 EXPOSE 5000
