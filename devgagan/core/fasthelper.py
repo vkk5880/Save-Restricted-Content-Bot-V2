@@ -8,7 +8,7 @@ from telethon.tl.types import InputDocumentFileLocation
 
 sys.path.insert(0, f"{pathlib.Path(__file__).parent.resolve()}")
 
-from devgagan.core.parallel_transfer import download_file, ParallelTransferrer
+from devgagan.core.parallel_transfertests import download_file, ParallelTransferrer
 from devgagan.core.parallel_transfer import upload_file
 
 class Timer:
