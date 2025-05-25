@@ -189,7 +189,7 @@ class StableDownloader:
         except Exception as e:
             logger.error(f"Progress callback error: {e}")
 
-async def stable_download(
+async def download_file(
     client: Client,
     message: Message,
     file_path: str,
