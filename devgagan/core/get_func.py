@@ -625,12 +625,31 @@ async def get_msg(userbot, sender, edit_id, msg_link, i, message):
         edit = await app.edit_message_text(sender, edit_id, "**Downloading...**")
 
         # Pyrogram Download
-        file = await userbot.download_media(
+        """file = await userbot.download_media(
                 msg,
                 file_name=file_name,
                 progress=progress_bar,
                 progress_args=("╭─────────────────────╮\n│      **__Downloading__...**\n├─────────────────────", edit, time.time())
             )
+        """
+
+
+
+
+        def progress(current, total):
+            app.edit_message_text(sender, edit_id, f"Downloaded {current / 1024 / 1024:.2f}MB of {total / 1024 / 1024:.2f}MB")
+            print(f"Downloaded {current / 1024 / 1024:.2f}MB of {total / 1024 / 1024:.2f}MB")
+            
+        
+        file = await download_file(
+            client=userbot,
+            message=msg,
+            file_path="./downloads/sample.file",
+            progress_callback=progress,
+            speed_limit=50,  # 10 MB/s
+            max_connections=4
+        )
+        
         
         caption = await get_final_caption(msg, sender)
 
