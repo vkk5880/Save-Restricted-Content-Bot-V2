@@ -1,4 +1,4 @@
-# parallel_downloader.py
+# parallel_downloader_fixed.py
 import asyncio
 import os
 import time
@@ -26,14 +26,14 @@ class ParallelPyrogramDownloader:
         client: Client,
         message: Message,
         speed_limit: Optional[int] = None,
-        max_connections: int = 4,
-        chunk_size: int = 1024 * 1024  # 1MB default
+        max_connections: int = 5,
+        chunk_size: int = 512 * 1024  # 512KB default (safe for most files)
     ):
         self.client = client
         self.message = message
         self.speed_limit = speed_limit  # in bytes per second
         self.max_connections = max_connections
-        self.chunk_size = chunk_size
+        self.base_chunk_size = min(chunk_size, 512 * 1024)  # Never exceed 512KB initially
         self.file_size = 0
         self.downloaded = 0
         self.start_time = time.time()
@@ -42,6 +42,7 @@ class ParallelPyrogramDownloader:
         self.file_location = None
         self.file_id = None
         self._hash = hashlib.md5()
+        self.adaptive_chunk_size = self.base_chunk_size
         
     async def _get_file_location(self) -> None:
         """Extract file location from Pyrogram message"""
@@ -68,36 +69,55 @@ class ParallelPyrogramDownloader:
             raise ValueError("Unsupported message type for download")
 
     async def _get_chunk(self, offset: int, chunk_size: int) -> bytes:
-        """Download a single chunk with retry logic"""
+        """Download a single chunk with retry and adaptive chunk sizing"""
         retries = 0
         max_retries = 3
         
         while retries < max_retries:
             try:
+                # Ensure we don't request more than the remaining bytes
+                actual_limit = min(chunk_size, self.file_size - offset)
+                
                 result = await self.client.invoke(
                     functions.upload.GetFile(
                         location=self.file_location,
                         offset=offset,
-                        limit=chunk_size
-                    )
+                        limit=actual_limit
+                    ),
+                    sleep_threshold=0
                 )
+                
+                # If successful, consider increasing chunk size
+                if retries == 0 and len(result.bytes) == chunk_size:
+                    self.adaptive_chunk_size = min(
+                        self.adaptive_chunk_size * 2,
+                        1024 * 1024  # Max 1MB even if successful
+                    )
+                
                 return result.bytes
+                
             except FloodWait as e:
                 logger.warning(f"Flood wait: Sleeping {e.value} seconds")
                 await asyncio.sleep(e.value)
                 retries += 1
             except BadRequest as e:
-                logger.error(f"Bad request error: {e}")
-                retries += 1
-                await asyncio.sleep(2 ** retries)
+                if "LIMIT_INVALID" in str(e):
+                    # Reduce chunk size on LIMIT_INVALID error
+                    self.adaptive_chunk_size = max(
+                        128 * 1024,  # Minimum 128KB
+                        self.adaptive_chunk_size // 2
+                    )
+                    logger.warning(f"Reducing chunk size to {self.adaptive_chunk_size} bytes due to LIMIT_INVALID")
+                    chunk_size = self.adaptive_chunk_size
+                    actual_limit = min(chunk_size, self.file_size - offset)
+                    retries += 1
+                    await asyncio.sleep(1)
+                else:
+                    logger.error(f"Bad request error: {e}")
+                    retries += 1
+                    await asyncio.sleep(2 ** retries)
                 
         raise Exception(f"Failed to download chunk after {max_retries} retries")
-
-    def _calculate_chunk_size(self) -> int:
-        """Dynamically adjust chunk size based on file size"""
-        if self.file_size > 100 * 1024 * 1024:  # >100MB files
-            return max(self.chunk_size, 4 * 1024 * 1024)  # 4MB chunks
-        return min(self.chunk_size, self.file_size)
 
     async def _limit_speed(self, chunk_length: int) -> None:
         """Enforce speed limit if specified"""
@@ -114,22 +134,6 @@ class ParallelPyrogramDownloader:
             
         self.last_update = time.time()
 
-    async def _progress_callback(
-        self, 
-        current: int, 
-        total: int,
-        callback: Optional[Callable] = None
-    ) -> None:
-        """Handle progress updates"""
-        if callback:
-            try:
-                if asyncio.iscoroutinefunction(callback):
-                    await callback(current, total)
-                else:
-                    callback(current, total)
-            except Exception as e:
-                logger.error(f"Progress callback error: {e}")
-
     async def download(
         self,
         file_path: str,
@@ -137,30 +141,30 @@ class ParallelPyrogramDownloader:
     ) -> str:
         """Main download method"""
         await self._get_file_location()
-        self.chunk_size = self._calculate_chunk_size()
         
-        chunks = self.file_size // self.chunk_size
-        if self.file_size % self.chunk_size != 0:
-            chunks += 1
+        # For small files, use single connection and full file size
+        if self.file_size <= 512 * 1024:  # 512KB or less
+            self.max_connections = 1
+            self.adaptive_chunk_size = self.file_size
+
+        chunks = (self.file_size + self.adaptive_chunk_size - 1) // self.adaptive_chunk_size
 
         logger.info(
             f"Starting download: {self.file_size} bytes "
-            f"in {chunks} chunks ({self.chunk_size} bytes/chunk)"
+            f"in {chunks} chunks (adaptive size, starting at {self.adaptive_chunk_size} bytes)"
         )
 
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
         
         try:
             with open(file_path, "wb") as f:
-                offsets = [(i * self.chunk_size, min(self.chunk_size, self.file_size - i * self.chunk_size))
-                          for i in range(chunks)]
-
                 tasks = []
-                for offset, limit in offsets:
-                    task = asyncio.create_task(
+                for i in range(chunks):
+                    offset = i * self.adaptive_chunk_size
+                    limit = min(self.adaptive_chunk_size, self.file_size - offset)
+                    tasks.append(
                         self._download_chunk(offset, limit, f, progress_callback)
                     )
-                    tasks.append(task)
 
                 await asyncio.gather(*tasks)
 
@@ -191,18 +195,14 @@ class ParallelPyrogramDownloader:
             self.downloaded += len(data)
             self._hash.update(data)
             
-            await self._progress_callback(self.downloaded, self.file_size, progress_callback)
-
-    @property
-    def md5_hash(self) -> str:
-        """Get MD5 hash of downloaded file"""
-        return self._hash.hexdigest()
-
-    @property
-    def download_speed(self) -> float:
-        """Calculate current download speed"""
-        elapsed = time.time() - self.start_time
-        return self.downloaded / elapsed if elapsed > 0 else 0
+            if progress_callback:
+                try:
+                    if asyncio.iscoroutinefunction(progress_callback):
+                        await progress_callback(self.downloaded, self.file_size)
+                    else:
+                        progress_callback(self.downloaded, self.file_size)
+                except Exception as e:
+                    logger.error(f"Progress callback error: {e}")
 
 async def download_file(
     client: Client,
@@ -210,7 +210,7 @@ async def download_file(
     file_path: str,
     progress_callback: Optional[Callable] = None,
     speed_limit: Optional[Union[int, float]] = None,  # in MB/s
-    max_connections: int = 4
+    max_connections: int = 3  # More conservative default
 ) -> str:
     """
     Public interface for parallel file download
@@ -227,33 +227,3 @@ async def download_file(
     )
     
     return await downloader.download(file_path, progress_callback)
-
-# Example usage
-"""async def main():
-    client = Client(
-        "my_account",
-        api_id=os.getenv("API_ID"),
-        api_hash=os.getenv("API_HASH")
-    )
-    
-    async with client:
-        # Replace with actual message ID and chat ID
-        message = await client.get_messages("me", 1)
-        
-        def progress(current, total):
-            print(f"Downloaded {current / 1024 / 1024:.2f}MB of {total / 1024 / 1024:.2f}MB")
-        
-        file_path = await download_file(
-            client=client,
-            message=message,
-            file_path="./downloads/sample.file",
-            progress_callback=progress,
-            speed_limit=10,  # 10 MB/s
-            max_connections=8
-        )
-        
-        print(f"File downloaded to: {file_path}")
-        print(f"MD5 checksum: {hashlib.md5(open(file_path, 'rb').read()).hexdigest()}")
-
-if __name__ == "__main__":
-    asyncio.run(main())"""
