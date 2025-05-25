@@ -48,7 +48,7 @@ from telethon import TelegramClient, events, Button
 from devgagan import app
 from devgagan import telethon_user_client  as gf
 from telethon.tl.types import MessageMediaDocument
-
+from devgagan.core.parallel_transfertests import download_file
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
