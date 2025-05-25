@@ -41,7 +41,7 @@ from pyrogram.errors import RPCError
 from pyrogram.types import Message
 from config import MONGO_DB as MONGODB_CONNECTION_STRING, LOG_GROUP, OWNER_ID, STRING, API_ID, CONTACT, API_HASH
 from devgagan.core.mongo.db import set_session, remove_session, get_data
-#from devgagantools import fast_upload
+from devgagantools import fast_upload as fast_uploads
 #from devgagantools import fast_download
 from devgagan.core.func import *
 from devgagan.modules.shrink import is_user_verified
@@ -259,7 +259,7 @@ async def upload_media_telethon(sender, target_chat_id, file, caption, topic_id)
 
         # Upload with floodwait handling
         try:
-            uploaded = await fast_upload(
+            uploaded = await fast_uploads(
                 gf, file,
                 reply=progress_message,
                 name=None,
