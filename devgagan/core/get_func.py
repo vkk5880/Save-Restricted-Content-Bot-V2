@@ -44,7 +44,7 @@ from devgagan.core.mongo.db import set_session, remove_session, get_data
 #from devgagantools import fast_download
 from devgagan.core.func import *
 from devgagan.modules.shrink import is_user_verified
-from devgagan.modules.main import initialize_userbot
+#from devgagan.modules.main import initialize_userbot
 from telethon import TelegramClient, events, Button
 from devgagan import app
 from devgagan import telethon_user_client  as gf
@@ -87,6 +87,26 @@ from telethon.errors import (
     ChatIdInvalidError,
     ChatInvalidError,
 )
+
+async def initialize_userbot(user_id): # this ensure the single startup .. even if logged in or not
+    """Initialize the userbot session for the given user."""
+    data = await db.get_data(user_id)
+    if data and data.get("session"):
+        try:
+            device = 'iPhone 16 Pro' # added gareebi text
+            userbot = Client(
+                "userbot",
+                api_id=API_ID,
+                api_hash=API_HASH,
+                device_model=device,
+                session_string=data.get("session")
+            )
+            await userbot.start()
+            return userbot
+        except Exception:
+            return None
+    return None
+
 
 async def get_msg_telethon(telethon_userbot, sender, edit_id, msg_link, i, message):
     """
