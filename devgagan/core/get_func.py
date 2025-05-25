@@ -44,7 +44,7 @@ from devgagan.core.mongo.db import set_session, remove_session, get_data
 #from devgagantools import fast_download
 from devgagan.core.func import *
 from devgagan.modules.shrink import is_user_verified
-from devgagan.modules.shrink import initialize_userbot
+from devgagan.modules.main import initialize_userbot
 from telethon import TelegramClient, events, Button
 from devgagan import app
 from devgagan import telethon_user_client  as gf
