@@ -44,6 +44,7 @@ from devgagan.core.mongo.db import set_session, remove_session, get_data
 #from devgagantools import fast_download
 from devgagan.core.func import *
 from devgagan.modules.shrink import is_user_verified
+from devgagan.modules.shrink import initialize_userbot
 from telethon import TelegramClient, events, Button
 from devgagan import app
 from devgagan import telethon_user_client  as gf
@@ -173,9 +174,16 @@ async def get_msg_telethon(telethon_userbot, sender, edit_id, msg_link, i, messa
                 progress_bar_function=lambda done, total: dl_progress_callback(done, total, sender)
             )
             await progress_message.delete()
+
+        except FileMigrateError as e:
+            # Fall back to get_msg if DC migration happens
+            await progress_message.delete()
+            logger.warning(f"File migrated to DC {e.new_dc}, falling back to get_msg")
+            userbot = await initialize_userbot(sender)
+            return await get_msg(userbot, sender, edit_id, msg_link, i, message)
         except Exception as e:
             await progress_message.edit(f"Error downloading with Telethon: {e}")
-            await progress_message.delete()
+            #await progress_message.delete()
             return
 
         caption = await get_final_caption(msg, sender)
