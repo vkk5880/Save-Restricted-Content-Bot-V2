@@ -26,6 +26,7 @@ from telethon.errors import (
     ChannelPrivateError, 
     ChatIdInvalidError, 
     ChatInvalidError,
+    FileMigrateError,
     FloodWaitError
 )
 from devgagan.core.fasthelper import fast_upload, fast_download, safe_turbo_download
