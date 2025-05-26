@@ -35,7 +35,7 @@ from session_converter import SessionManager
 from pyrogram.handlers import MessageHandler, CallbackQueryHandler
 from telethon.errors import FloodWaitError
 from devgagan.modules.shrink import is_user_verified
-from config import MONGO_DB as MONGODB_CONNECTION_STRING, LOG_GROUP, OWNER_ID, STRING, API_ID, CONTACT, API_HASH
+from config import MONGO_DB as MONGODB_CONNECTION_STRING, LOG_GROUP, OWNER_ID, STRING, API_ID, CONTACT, API_HASH, CHANNEL_LINK
 import logging
 from telethon import TelegramClient
 from telethon.sessions import StringSession
@@ -471,7 +471,7 @@ async def batch_link(_, message):
         await message.reply(response_message)
         return
         
-    join_button = InlineKeyboardButton("Join Channel", url="https://t.me/+9FZJh0WMZnE4YWRk")
+    join_button = InlineKeyboardButton("Join Channel", url=CHANNEL_LINK)
     keyboard = InlineKeyboardMarkup([[join_button]])
     pin_msg = await app.send_message(
         user_id,
