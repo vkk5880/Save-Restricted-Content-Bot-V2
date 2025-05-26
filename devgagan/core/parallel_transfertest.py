@@ -205,16 +205,6 @@ class DownloadSender:
             await asyncio.sleep(e.seconds)
             return await self.next()
             
-        """except FileMigrateError as e:
-            logger.info(f"File migrated to DC {e.new_dc}, reconnecting...")
-            await self.sender.disconnect()
-            # Fix: Properly decrement active connections
-            async with self.transferrer._connection_lock:
-                self.transferrer._active_connections -= 1
-            self.sender = await self.transferrer._create_sender_for_dc(e.new_dc)
-            self.request.offset = 0
-            return await self.next()"""
-                
         except Exception as e:
             logger.error(f"Unexpected error in DownloadSender: {str(e)}")
             await self.disconnect()
