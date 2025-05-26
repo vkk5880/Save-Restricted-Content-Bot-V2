@@ -206,8 +206,8 @@ class DownloadSender:
             return await self.next()
 
         except FileMigrateError as e:
-        await self.disconnect()
-        raise  # Re-raise the exception instead of handling it
+            await self.disconnect()
+            raise  # Re-raise the exception instead of handling it
         
         except Exception as e:
             logger.error(f"Unexpected error in DownloadSender: {str(e)}")
