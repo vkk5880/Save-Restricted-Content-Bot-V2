@@ -190,7 +190,7 @@ async def get_msg_telethon(telethon_userbot, sender, edit_id, msg_link, i, messa
         progress_message = await gf.send_message(sender, "**__Downloading__...**")
 
         try:
-            file = await safe_turbo_download(
+            file = await fast_download(
                 telethon_userbot, msg,
                 reply=progress_message,
                 progress_bar_function=lambda done, total: dl_progress_callback(done, total, sender)
