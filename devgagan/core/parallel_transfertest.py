@@ -204,7 +204,11 @@ class DownloadSender:
             logger.warning(f"Flood wait error, sleeping for {e.seconds} seconds")
             await asyncio.sleep(e.seconds)
             return await self.next()
-            
+
+        except FileMigrateError as e:
+        await self.disconnect()
+        raise  # Re-raise the exception instead of handling it
+        
         except Exception as e:
             logger.error(f"Unexpected error in DownloadSender: {str(e)}")
             await self.disconnect()
