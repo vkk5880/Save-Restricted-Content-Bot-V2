@@ -115,7 +115,7 @@ async def process_and_upload_link_telethon(telethon_userbot, user_id, msg_id, li
     print("process_and_upload_link method_telethon.")
     try:
         await get_msg_telethon(telethon_userbot, user_id, msg_id, link, retry_count, message)
-        await asyncio.sleep(8)
+        await asyncio.sleep(15)
     finally:
         pass
 
