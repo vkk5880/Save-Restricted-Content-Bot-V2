@@ -114,6 +114,7 @@ async def get_msg_telethon(telethon_userbot, sender, edit_id, msg_link, i, messa
     """
     Handles message processing using Telethon client.
     """
+    logger.info("Handles message processing using Telethon client, get_msg_telethon")
     file = ''
     edit = None
     try:
@@ -190,6 +191,7 @@ async def get_msg_telethon(telethon_userbot, sender, edit_id, msg_link, i, messa
         progress_message = await gf.send_message(sender, "**__Downloading__...**")
 
         try:
+            logger.info("__Downloading__  media using Telethon client, fast_download")
             file = await fast_download(
                 telethon_userbot, msg,
                 reply=progress_message,
@@ -577,6 +579,7 @@ async def upload_media(sender, target_chat_id, file, caption, edit, topic_id):
 
 async def get_msg(userbot, sender, edit_id, msg_link, i, message):
     try:
+        logger.info("Handles message processing using Pyrogram client, get_msg")
         # Sanitize the message link
         msg_link = msg_link.split("?single")[0]
         chat, msg_id = None, None
