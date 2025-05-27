@@ -16,7 +16,7 @@ from time import time
 from speedtest import Speedtest
 from telethon import events
 from telethon.tl.custom import Button
-from devgagan import sex as gagan
+from devgagan import telethon_user_client as gagan
 from devgagan import botStartTime  
 from config import CONTACT  
 

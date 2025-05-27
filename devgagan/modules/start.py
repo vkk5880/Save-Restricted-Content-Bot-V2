@@ -33,7 +33,9 @@ async def set(_, message):
     await app.set_bot_commands([
         BotCommand("start", "🚀 Start the bot"),
         BotCommand("login", "🔑 Get into the bot"),
+        BotCommand("telethon_login", "🔑 Get into the bot for fast-download 🚀 PREMIUM "),
         BotCommand("logout", "🚪 Get out of the bot"),
+        BotCommand("logout_all", "🚪 Get out of the bot all accounts"),
         BotCommand("batch", "🫠 Extract in bulk"),
         BotCommand("cancel", "🚫 Cancel batch process"),
         BotCommand("myplan", "⌛ Get your plan details"),

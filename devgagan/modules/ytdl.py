@@ -23,7 +23,7 @@ import string
 import requests
 import logging
 import cv2
-from devgagan import sex as client
+from devgagan import telethon_user_client as client
 from pyrogram import Client,filters
 from telethon import events
 from telethon.sync import TelegramClient

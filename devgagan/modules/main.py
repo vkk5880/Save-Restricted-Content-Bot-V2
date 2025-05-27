@@ -17,10 +17,12 @@ import time
 import random
 import string
 import asyncio
+import pymongo
 from pyrogram import filters, Client
 from devgagan import app
 from config import API_ID, API_HASH, FREEMIUM_LIMIT, PREMIUM_LIMIT, OWNER_ID
 from devgagan.core.get_func import get_msg
+from devgagan.core.get_func import get_msg_telethon
 from devgagan.core.func import *
 from devgagan.core.mongo import db
 from pyrogram.errors import FloodWait
@@ -28,7 +30,25 @@ from datetime import datetime, timedelta
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from devgagan.core.mongo.db import user_sessions_real
 import subprocess
+from telethon.sync import TelegramClient
+from session_converter import SessionManager
 from pyrogram.handlers import MessageHandler, CallbackQueryHandler
+from telethon.errors import FloodWaitError
+from devgagan.modules.shrink import is_user_verified
+from config import MONGO_DB as MONGODB_CONNECTION_STRING, LOG_GROUP, OWNER_ID, STRING, API_ID, CONTACT, API_HASH, CHANNEL_LINK
+import logging
+from telethon import TelegramClient
+from telethon.sessions import StringSession
+from telethon.errors import (
+    SessionPasswordNeededError,
+    AuthKeyError,
+    AccessTokenExpiredError,
+    AuthKeyDuplicatedError
+)
+import asyncio
+
+
+
 '''
 from devgagan.modules.connect_user import (
     connect_user, 
@@ -61,12 +81,46 @@ register_handlers(connect_app)
 connect_app.run()
 
 '''
+# MongoDB database name and collection name
+DB_NAME = "smart_users"
+COLLECTION_NAME = "super_user"
+
+mongo_app = pymongo.MongoClient(MONGODB_CONNECTION_STRING)
+mongo_db = mongo_app[DB_NAME]
+collection = mongo_db[COLLECTION_NAME]
+
+async def fetch_upload_method(message, user_id):
+    """Fetch the user's preferred upload method."""
+    freecheck = await chk_user(message, user_id)
+    if freecheck == 1 and user_id not in OWNER_ID and not await is_user_verified(user_id):
+        print("Always Pyrogram for non-pro ...")
+        return "Pyrogram" # Always Pyrogram for non-pro
+
+    user_data = collection.find_one({"user_id": user_id})
+    #print(f"fetch_upload_method ... {user_data.get('upload_method', 'Pyrogram')}")
+    return user_data.get("upload_method", "Pyrogram") if user_data else "Pyrogram"
+
+
+
 async def process_and_upload_link(userbot, user_id, msg_id, link, retry_count, message):
+    print("process_and_upload_link method.")
     try:
         await get_msg(userbot, user_id, msg_id, link, retry_count, message)
+        await asyncio.sleep(4)
+    finally:
+        pass
+
+
+async def process_and_upload_link_telethon(telethon_userbot, user_id, msg_id, link, retry_count, message):
+    print("process_and_upload_link method_telethon.")
+    try:
+        await get_msg_telethon(telethon_userbot, user_id, msg_id, link, retry_count, message)
         await asyncio.sleep(15)
     finally:
         pass
+
+
+
 
 # Function to check if the user can proceed
 async def check_interval(user_id, freecheck):
@@ -126,32 +180,138 @@ async def single_link(_, message):
 
     link = message.text if "tg://openmessage" in message.text else get_link(message.text)
     msg = await message.reply("Processing...")
-    userbot = await initialize_userbot(user_id)
 
+    upload_methods = await fetch_upload_method(message, user_id)  # Fetch the upload method (Pyrogram or Telethon)
+    print(f"upload_method ... {upload_methods}")
+    telethon_userbot = None
+    userbot = None
+    if upload_methods == "Pyrogram":
+        userbot = await initialize_userbot(user_id)
+    elif upload_methods == "Telethon":
+        telethon_userbot  = await initialize_telethon_userbot(user_id)
     try:
         if await is_normal_tg_link(link):
             # Pass userbot if available; handle normal Telegram links
-            await process_and_upload_link(userbot, user_id, msg.id, link, 0, message)
+            print("process_and_upload_link.")
+            if upload_methods == "Pyrogram":
+                await process_and_upload_link(userbot, user_id, msg.id, link, 0, message)
+            elif upload_methods == "Telethon":
+                if telethon_userbot is None:
+                    print("telethon_userbot is Non.")
+                    await message.reply("telethon_userbot is Non.")
+                    return
+                await process_and_upload_link_telethon(telethon_userbot, user_id, msg.id, link, 0, message)
             await set_interval(user_id, interval_minutes=45)
+            print("process_and_upload_link was completed.")
         else:
             # Handle special Telegram links
-            await process_special_links(userbot, user_id, msg, link)
+            print("process_and_upload_special_link.")
+            if upload_methods == "Pyrogram":
+                await process_special_links(userbot, user_id, msg, link)
+            elif upload_methods == "Telethon":
+                if telethon_userbot is None:
+                    print("telethon_userbot is Non.")
+                    await message.reply("telethon_userbot is Non.")
+                    return
+                await process_special_links_telethon(telethon_userbot, user_id, msg, link)
             
-    except FloodWait as fw:
-        await msg.edit_text(f'Try again after {fw.x} seconds due to floodwait from Telegram.')
+    except (FloodWaitError, FloodWait) as fw:
+        seconds = fw.seconds if hasattr(fw, 'seconds') else fw.value
+        await msg.edit_text(f'Try again in {seconds} seconds due to floodwait from Telegram.')
     except Exception as e:
         await msg.edit_text(f"Link: `{link}`\n\n**Error:** {str(e)}")
     finally:
         users_loop[user_id] = False
         if userbot:
             await userbot.stop()
+        if telethon_userbot:
+            await telethon_userbot.disconnect()
         try:
             await msg.delete()
         except Exception:
             pass
 
 
-from pyrogram import Client, filters
+
+
+
+
+# Initialize logger at module level
+logger = logging.getLogger(__name__)
+
+
+
+
+async def initialize_telethon_userbot(user_id):
+    """
+    Initialize and verify Telethon userbot with complete status checking
+    Returns: TelegramClient instance or None if initialization fails
+    """
+    try:
+        # 1. Get session from DB
+        sessions = await db.get_sessions(user_id)
+        if not sessions or not sessions.get("telethon_session"):
+            logger.warning(f"No Telethon session found for user {user_id}")
+            return None
+
+        # 2. Create client instance
+        telethon_userbot = TelegramClient(
+            session=StringSession(sessions["telethon_session"]),
+            api_id=API_ID,
+            api_hash=API_HASH,
+            device_model="iPhone 16 Pro",
+            system_version="13.3.1",
+        )
+
+        # 3. Start connection with verification
+        try:
+            await telethon_userbot.start()
+            print(f"Original DC: {telethon_userbot.session.dc_id}")
+            #await telethon_userbot.disconnect()
+            #await telethon_userbot._switch_dc(4)  # Europe
+            #print(f"New DC: {telethon_userbot.session.dc_id}")
+            #await telethon_userbot.start()
+            #telethon_userbot.session = StringSession(sessions["telethon_session"])
+            #await telethon_userbot.connect()  # Reconnect with the session
+            #await telethon_userbot.get_me()  # Test API call
+            # 4. Verify active connection
+            if not telethon_userbot.is_connected():
+                logger.error("Start completed but not actually connected")
+                await telethon_userbot.disconnect()
+                return None
+
+            # 5. Verify authorization
+            if not await telethon_userbot.is_user_authorized():
+                logger.error("Session invalid - not authorized")
+                await telethon_userbot.disconnect()
+                await db.remove_telethon_session(user_id)
+                return None
+
+            # 6. Test API call
+            try:
+                me = await telethon_userbot.get_me()
+                logger.info(f"Successfully started as @{me.username}")
+                return telethon_userbot
+            except Exception as api_error:
+                logger.error(f"API test failed: {str(api_error)}")
+                await telethon_userbot.disconnect()
+                return None
+
+        except (ConnectionError, asyncio.TimeoutError) as e:
+            logger.error(f"Connection failed: {str(e)}")
+            return None
+        except AuthKeyError as e:
+            logger.error(f"Invalid auth key: {str(e)}")
+            await db.remove_telethon_session(user_id)
+            return None
+
+    except Exception as e:
+        logger.error(f"Unexpected error: {str(e)}", exc_info=True)
+        return None
+
+
+
+
 
 async def initialize_userbot(user_id): # this ensure the single startup .. even if logged in or not
     """Initialize the userbot session for the given user."""
@@ -173,6 +333,57 @@ async def initialize_userbot(user_id): # this ensure the single startup .. even 
     return None
 
 
+async def convert_user_string(pyrogram_string: str):
+    # Convert to Telethon session
+
+    if not pyrogram_string:
+        print("Error: Pyrogram session string provided to conversion is empty.")
+        return None
+
+
+    try:
+        # Convert to Telethon session
+        # from_pyrogram_string_session requires the API_ID
+        session_manager = SessionManager.from_pyrogram_string_session(pyrogram_string)
+
+        # Export the session as a Telethon string
+        telethon_session_string = session_manager.telethon_string_session()
+        print(telethon_session_string)
+        return telethon_session_string
+
+    except Exception as e:
+        print(f"Error during session conversion: {e}")
+        # You might want more specific error handling here
+        return None
+
+
+
+async def initialize_telethon_userbotsss(user_id): # this ensure the single startup .. even if logged in or not
+    """Initialize the userbot session for the given user."""
+    sessions = await db.get_sessions(user_id)
+    if sessions:
+        telethon_string = sessions["telethon_session"]
+        try:
+            device = 'iPhone 16 Pro' # added gareebi text
+            telethon_userbot = TelegramClient(
+                "telethon_userbot",
+                api_id=API_ID,
+                api_hash=API_HASH,
+                device_model=device,
+                session_string=telethon_string
+            )
+            await telethon_userbot.start()
+            print("telethon_userbot success")
+            return telethon_userbot
+        except Exception:
+            print("telethon_userbot  error")
+            return None
+
+    print("telethon_session_string or data none")
+    return None
+
+
+
 async def is_normal_tg_link(link: str) -> bool:
     """Check if the link is a standard Telegram link."""
     special_identifiers = ['t.me/+', 't.me/c/', 't.me/b/', 'tg://openmessage']
@@ -189,6 +400,18 @@ async def process_special_links(userbot, user_id, msg, link):
     else:
         await msg.edit_text("Invalid link format.")
 
+async def process_special_links_telethon(telethon_userbot, user_id, msg, link):
+    """Handle special Telegram links using Telethon."""
+    if 't.me/+' in link:
+        result = await telethon_userbot_join(telethon_userbot, link)
+        await msg.edit_text(result)
+    elif any(sub in link for sub in ['t.me/c/', 't.me/b/', '/s/', 'tg://openmessage']):
+        await process_and_upload_link_telethon(telethon_userbot, user_id, msg.id, link, 0, msg)
+        await set_interval(user_id, interval_minutes=45)
+    else:
+        await msg.edit_text("Invalid link format.")
+
+
 
 @app.on_message(filters.command("batch") & filters.private)
 async def batch_link(_, message):
@@ -196,6 +419,7 @@ async def batch_link(_, message):
     if join == 1:
         return
     user_id = message.chat.id
+    
     # Check if a batch process is already running
     if users_loop.get(user_id, False):
         await app.send_message(
@@ -247,7 +471,7 @@ async def batch_link(_, message):
         await message.reply(response_message)
         return
         
-    join_button = InlineKeyboardButton("Join Channel", url="https://t.me/+9FZJh0WMZnE4YWRk")
+    join_button = InlineKeyboardButton("Join Channel", url=CHANNEL_LINK)
     keyboard = InlineKeyboardMarkup([[join_button]])
     pin_msg = await app.send_message(
         user_id,
@@ -257,50 +481,71 @@ async def batch_link(_, message):
     await pin_msg.pin(both_sides=True)
 
     users_loop[user_id] = True
+    telethon_userbot = None
+    userbot = None
+    
     try:
+        upload_methods = await fetch_upload_method(message, user_id)
+        print(f"upload_method ... {upload_methods}")
+        
+        # Initialize the appropriate client
+        if upload_methods == "Pyrogram":
+            userbot = await initialize_userbot(user_id)
+        elif upload_methods == "Telethon":
+            telethon_userbot = await initialize_telethon_userbot(user_id)
+        
         normal_links_handled = False
-        userbot = await initialize_userbot(user_id)
-        # Handle normal links first
+        
+        # Process all links
         for i in range(cs, cs + cl):
-            if user_id in users_loop and users_loop[user_id]:
-                url = f"{'/'.join(start_id.split('/')[:-1])}/{i}"
-                link = get_link(url)
-                # Process t.me links (normal) without userbot
+            if not users_loop.get(user_id, False):
+                break
+                
+            url = f"{'/'.join(start_id.split('/')[:-1])}/{i}"
+            link = get_link(url)
+            msg = await app.send_message(message.chat.id, f"Processing...")
+            
+            try:
+                # Handle normal public links
                 if 't.me/' in link and not any(x in link for x in ['t.me/b/', 't.me/c/', 'tg://openmessage']):
-                    msg = await app.send_message(message.chat.id, f"Processing...")
-                    await process_and_upload_link(userbot, user_id, msg.id, link, 0, message)
-                    await pin_msg.edit_text(
-                        f"Batch process started ⚡\nProcessing: {i - cs + 1}/{cl}\n\n****",
-                        reply_markup=keyboard
-                    )
+                    if upload_methods == "Pyrogram":
+                        await process_and_upload_link(userbot, user_id, msg.id, link, i-cs, message)
+                    elif upload_methods == "Telethon":
+                        await process_and_upload_link_telethon(telethon_userbot, user_id, msg.id, link, i-cs, message)
                     normal_links_handled = True
+                
+                # Handle special links
+                elif any(x in link for x in ['t.me/b/', 't.me/c/', 'tg://openmessage']):
+                    if upload_methods == "Pyrogram" and userbot:
+                        await process_special_links(userbot, user_id, msg, link)
+                    elif upload_methods == "Telethon" and telethon_userbot:
+                        await process_special_links_telethon(telethon_userbot, user_id, msg, link)
+                    else:
+                        await app.send_message(message.chat.id, "Login in bot first ...")
+                        break
+                
+                await pin_msg.edit_text(
+                    f"Batch process started ⚡\nProcessing: {i - cs + 1}/{cl}\n\n****",
+                    reply_markup=keyboard
+                )
+                
+            except (FloodWaitError, FloodWait) as fw:
+                seconds = fw.seconds if hasattr(fw, 'seconds') else fw.value
+                await msg.edit_text(f'FloodWait: Try again in {seconds} seconds')
+                await asyncio.sleep(seconds)
+                continue
+            except Exception as e:
+                await msg.edit_text(f"Error processing {link}: {str(e)}")
+                continue
+            finally:
+                try:
+                    await msg.delete()
+                except:
+                    pass
+
         if normal_links_handled:
             await set_interval(user_id, interval_minutes=300)
-            await pin_msg.edit_text(
-                f"Batch completed successfully for {cl} messages 🎉\n\n****",
-                reply_markup=keyboard
-            )
-            await app.send_message(message.chat.id, "Batch completed successfully! 🎉")
-            return
-            
-        # Handle special links with userbot
-        for i in range(cs, cs + cl):
-            if not userbot:
-                await app.send_message(message.chat.id, "Login in bot first ...")
-                users_loop[user_id] = False
-                return
-            if user_id in users_loop and users_loop[user_id]:
-                url = f"{'/'.join(start_id.split('/')[:-1])}/{i}"
-                link = get_link(url)
-                if any(x in link for x in ['t.me/b/', 't.me/c/']):
-                    msg = await app.send_message(message.chat.id, f"Processing...")
-                    await process_and_upload_link(userbot, user_id, msg.id, link, 0, message)
-                    await pin_msg.edit_text(
-                        f"Batch process started ⚡\nProcessing: {i - cs + 1}/{cl}\n\n****",
-                        reply_markup=keyboard
-                    )
-
-        await set_interval(user_id, interval_minutes=300)
+        
         await pin_msg.edit_text(
             f"Batch completed successfully for {cl} messages 🎉\n\n****",
             reply_markup=keyboard
@@ -308,9 +553,17 @@ async def batch_link(_, message):
         await app.send_message(message.chat.id, "Batch completed successfully! 🎉")
 
     except Exception as e:
-        await app.send_message(message.chat.id, f"Error: {e}")
+        await app.send_message(message.chat.id, f"Batch processing failed: {e}")
     finally:
         users_loop.pop(user_id, None)
+        if userbot:
+            await userbot.stop()
+        if telethon_userbot:
+            await telethon_userbot.disconnect()
+        
+
+
+
 
 @app.on_message(filters.command("cancel"))
 async def stop_batch(_, message):
@@ -345,181 +598,3 @@ async def stop_batch(_, message):
 
 
 
-
-
-
-
-
-
-
-"""
-
-
-
-
-#OWNER_ID = 1970647198
-active_connections = {}  
-pending_messages = {}  # ✅ Store messages per admin
-
-# ✅ Function to handle /connect_user command (Admin only)
-@app.on_message(filters.command("connect_user") & filters.user(OWNER_ID))
-async def connect_user(app, message):
-    admin_id = message.chat.id
-    # ✅ Check if the owner is already connected to a user
-    if admin_id in active_connections:
-        current_user_id = active_connections[admin_id]
-        current_user = await user_sessions_real.find_one({"user_id": current_user_id})
-        current_user_name = current_user.get("username", "Unknown User") 
-        await message.reply(f"❌ You are already connected with {current_user_name}.To connect with another user, disconnect the current user using /disconnect_user .")
-        return  # ✅ Stop execution here if already connected
-    
-    
-    await message.reply("Enter the User ID or Username to connect:")
-    try:
-        # ✅ Wait for admin response (Handle Timeout)
-        user_id_msg = await app.listen(admin_id, timeout=60)
-        user_input = user_id_msg.text.strip()
-    except asyncio.TimeoutError:  # ✅ Catch timeout error properly
-        await message.reply("❌ Timeout! You took too long to respond. Please enter the command again.")
-        return
-
-    # ✅ Remove '@' if present in username
-    if user_input.startswith("@"): 
-        user_input = user_input[1:]
-
-    # ✅ Create a correct database query
-    query = {"username": user_input} if not user_input.isdigit() else {"user_id": int(user_input)}
-
-    user_session = await user_sessions_real.find_one(query)
-
-    if not user_session:
-        await message.reply("❌ User not found in the database.")
-        return
-
-    user_id = user_session["user_id"]
-    user_name = user_session.get("username", "Unknown User")
-
-    # Store the active connection both ways
-    active_connections[admin_id] = user_id
-    active_connections[user_id] = admin_id  
-
-    # Notify both parties
-    await message.reply(f"✅ Connected to {user_name} successfully.")
-    await app.send_message(user_id, "⚡ Owner connected with you.")
-
-# ✅ Function to handle /disconnect_user command (Admin only)
-@app.on_message(filters.command("disconnect_user") & filters.user(OWNER_ID))
-async def disconnect_user(app, message):
-    admin_id = message.chat.id
-    user_id = active_connections.get(admin_id)  # ✅ Get user ID safely
-
-    if user_id:
-        active_connections.pop(admin_id, None)  # ✅ Remove safely
-        active_connections.pop(user_id, None)
-
-        await message.reply("🛑 Connection Destroyed!")
-        await app.send_message(user_id, "🛑 Connection Destroyed!")
-    else:
-        await message.reply("❌ No active connection found.")
-
-# ✅ Function to confirm message before sending
-@app.on_message(filters.private & filters.user(OWNER_ID))
-async def owner_message_handler(app, message):
-    if message.text.startswith("/"):
-        return  # Ignore commands, let other handlers process them
-        
-    admin_id = message.chat.id
-    if admin_id not in active_connections:
-        return  
-
-    user_id = active_connections[admin_id]  
-    msg_text = message.text or "📎 Media Message"
-
-    # ✅ Store message per admin (Fix ID conflict issue)
-    if admin_id not in pending_messages:
-        pending_messages[admin_id] = {}
-    pending_messages[admin_id][message.id] = msg_text  
-
-    # Send confirmation with inline buttons
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("✅ Send", callback_data=f"send|{message.id}|{admin_id}")],
-        [InlineKeyboardButton("❌ Cancel", callback_data=f"cancel|{message.id}|{admin_id}")]
-    ])
-    
-    await message.reply("Do you want to send this message?", reply_markup=keyboard)
-
-# ✅ Callback handler for sending message
-@app.on_callback_query(filters.regex("^send\\|"))
-async def send_message_callback(app, query):
-    _, msg_id, user_id = query.data.split("|")
-    user_id = int(user_id)
-    msg_id = int(msg_id)
-    admin_id = query.from_user.id  
-
-    # ✅ Retrieve message correctly from nested dictionary
-    msg_text = pending_messages.get(admin_id, {}).pop(msg_id, None) or "⚠️ Message not found!"
-
-    if msg_text != "⚠️ Message not found!":
-        await app.send_message(user_id, f"👤 Owner: {msg_text}")  
-
-    # ✅ Cleanup: Remove admin entry if no pending messages left
-    if admin_id in pending_messages and not pending_messages[admin_id]:
-        del pending_messages[admin_id]
-    # ✅ Delete the original confirmation message
-    await query.message.delete()
-    await app.send_message(admin_id, "✅ Message sent successfully!")
-
-# ✅ Callback handler for cancelling message
-@app.on_callback_query(filters.regex("^cancel\\|"))
-async def cancel_message_callback(app, query):
-    _, admin_id, msg_id = query.data.split("|")
-    admin_id = int(admin_id)
-    msg_id = int(msg_id)
-
-    # ✅ Remove message correctly
-    if admin_id in pending_messages:
-        pending_messages[admin_id].pop(msg_id, None)
-        
-        # ✅ Cleanup if admin has no more pending messages
-        if not pending_messages[admin_id]:
-            del pending_messages[admin_id]
-    # ✅ Delete the original confirmation message
-    await query.message.delete()
-    await app.send_message(admin_id, "❌ Message sending cancelled.")
-
-# ✅ User message handler (sends reply back to owner)
-@app.on_message(filters.private & ~filters.user(OWNER_ID))
-async def user_reply_handler(app, message):
-    user_id = message.chat.id
-
-    if user_id in active_connections:
-        admin_id = active_connections[user_id]  
-        
-        if message.text:
-            msg_text = message.text
-            await app.send_message(admin_id, f"💬 {message.from_user.first_name}: {msg_text}")
-        
-        elif message.photo:
-            msg_text = "📷 Photo Message"
-            await app.send_photo(admin_id, message.photo.file_id, caption=f"💬 {message.from_user.first_name}: {msg_text}")
-        
-        elif message.video:
-            msg_text = "📹 Video Message"
-            await app.send_video(admin_id, message.video.file_id, caption=f"💬 {message.from_user.first_name}: {msg_text}")
-        
-        else:
-            msg_text = "📎 Media Message"
-            await app.send_message(admin_id, f"💬 {message.from_user.first_name}: {msg_text}")
-"""
-"""
-# ✅ Register all handlers
-def register_handlers(app):
-    app.add_handler(MessageHandler(connect_user, filters.command("connect_user") & filters.user(OWNER_ID)))
-    app.add_handler(MessageHandler(disconnect_user, filters.command("disconnect_user") & filters.user(OWNER_ID)))
-    app.add_handler(MessageHandler(owner_message_handler, filters.private & filters.user(OWNER_ID)))
-    app.add_handler(MessageHandler(user_reply_handler, filters.private & ~filters.user(OWNER_ID)))
-    app.add_handler(CallbackQueryHandler(send_message_callback, filters.regex("^send\\|")))
-    app.add_handler(CallbackQueryHandler(cancel_message_callback, filters.regex("^cancel\\|")))
-
-register_handlers(app)  # ✅ Call the function to register handlers
-"""
