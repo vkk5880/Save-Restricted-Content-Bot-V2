@@ -192,7 +192,7 @@ async def get_msg_telethon(telethon_userbot, sender, edit_id, msg_link, i, messa
 
         try:
             logger.info("__Downloading__  media using Telethon client, fast_download")
-            file = await fast_download(
+            file = await safe_turbo_download(
                 telethon_userbot, msg,
                 reply=progress_message,
                 progress_bar_function=lambda done, total: dl_progress_callback(done, total, sender)
