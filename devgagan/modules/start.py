@@ -40,6 +40,7 @@ async def set(_, message):
         BotCommand("cancel", "🚫 Cancel batch process"),
         BotCommand("myplan", "⌛ Get your plan details"),
         BotCommand("transfer", "💘 Gift premium to others"),
+        BotCommand("setbot", "🤖 Set Up your custom bot for uploding"),
         BotCommand("settings", "⚙️ Personalize things"),
         BotCommand("speedtest", "🚅 Speed of server"),
         BotCommand("help", "❓ If you're a noob, still!"),
@@ -90,9 +91,11 @@ help_pages = [
         "> Cancel ongoing batch process\n\n"
         "16. **/myplan**\n"
         "> Get details about your plans\n\n"
-        "17. **/session**\n"
+        "17. **/setbot**\n"
+        "> Set your own bot for downloading & uploding videos \n\n"
+        "18. **/session**\n"
         "> Generate Pyrogram V2 session\n\n"
-        "18. **/settings**\n"
+        "19. **/settings**\n"
         "> 1. SETCHATID : To directly upload in channel or group or user's dm use it with -100[chatID]\n"
         "> 2. SETRENAME : To add custom rename tag or username of your channels\n"
         "> 3. CAPTION : To add custom caption\n"
