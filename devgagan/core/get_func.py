@@ -50,6 +50,7 @@ from devgagan.modules.shrink import is_user_verified
 from telethon import TelegramClient, events, Button
 from devgagan import app
 from devgagan import telethon_user_client  as gf
+from devgagan.modules.main import bot_client_pyro, bot_client_tele
 from telethon.tl.types import MessageMediaDocument
 
 # Set up logging
@@ -192,7 +193,7 @@ async def get_msg_telethon(telethon_userbot, sender, edit_id, msg_link, i, messa
 
         try:
             logger.info("__Downloading__  media using Telethon client, fast_download")
-            file = await safe_turbo_download(
+            file = await fast_download(
                 telethon_userbot, msg,
                 reply=progress_message,
                 progress_bar_function=lambda done, total: dl_progress_callback(done, total, sender)
@@ -221,7 +222,11 @@ async def get_msg_telethon(telethon_userbot, sender, edit_id, msg_link, i, messa
 
         result = None
         if isinstance(msg.media, types.MessageMediaPhoto):
-            result = await app.send_photo(target_chat_id, file, caption=caption, reply_to_message_id=topic_id)
+            if user_id not in OWNER_ID:
+                result = await bot_client_tele.send_photo(target_chat_id, file, caption=caption, reply_to_message_id=topic_id)
+
+            else:
+                result = await app.send_photo(target_chat_id, file, caption=caption, reply_to_message_id=topic_id)
         else:
             # Fallback for other media types or if file size exceeds limit
             if file_size and file_size > size_limit:
@@ -266,10 +271,13 @@ async def upload_media_telethon(sender, target_chat_id, file, caption, topic_id)
         #await edit.delete()
         progress_message = await gf.send_message(sender, "**__Uploading...__**")
 
+        bot_client = gf
+        if user_id not in OWNER_ID:
+            bot_client = bot_client_tele
         # Upload with floodwait handling
         try:
             uploaded = await fast_uploads(
-                gf, file,
+                bot_client, file,
                 reply=progress_message,
                 name=None,
                 progress_bar_function=lambda done, total: progress_callback(done, total, sender)
@@ -279,7 +287,7 @@ async def upload_media_telethon(sender, target_chat_id, file, caption, topic_id)
             await asyncio.sleep(fw.seconds)
             # Retry after floodwait
             uploaded = await fast_upload(
-                gf, file,
+                bot_client, file,
                 reply=progress_message,
                 name=None,
                 progress_bar_function=lambda done, total: progress_callback(done, total, sender)
@@ -298,7 +306,7 @@ async def upload_media_telethon(sender, target_chat_id, file, caption, topic_id)
             ))
 
         # Send to target chat
-        await gf.send_file(
+        await bot_client.send_file(
             target_chat_id,
             uploaded,
             caption=caption,
@@ -510,10 +518,13 @@ async def upload_media(sender, target_chat_id, file, caption, edit, topic_id):
         # Determine file extension
         file_extension = file.split('.')[-1].lower()
 
+        bot_client = app
+        if user_id not in OWNER_ID:
+            bot_client = bot_client_pyro
         # Check file format and upload accordingly
         if file_extension in video_formats:
             # Correctly indented block for video upload
-            dm = await app.send_video(
+            dm = await bot_client.send_video(
                 chat_id=target_chat_id,
                 video=file,
                 caption=caption,
@@ -554,7 +565,18 @@ async def upload_media(sender, target_chat_id, file, caption, edit, topic_id):
                 progress_args=("╭─────────────────────╮\n│      **__Pyro Uploader__**\n├─────────────────────", edit, time.time())
             )
             await asyncio.sleep(2) # Added a small delay as in your original code
-            await dm.copy(LOG_GROUP) # Copy to log group
+            if bot_client == app:
+                await dm.copy(LOG_GROUP) # Copy to log group
+
+            else:
+                try:
+                    await app.copy_message(chat_id=LOG_GROUP,
+                                           from_chat_id=dm.chat.id,
+                                           message_id=dm.id,
+                                           )
+                    
+                except Exception as e:
+                    logger.error(f"Copy failed: {e}")
 
 
     except Exception as e:
