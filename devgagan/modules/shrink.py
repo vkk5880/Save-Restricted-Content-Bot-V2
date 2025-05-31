@@ -237,7 +237,8 @@ async def setbot_handler(client: Client, message: Message):
         return
     
     # Save to database
-    save_userbot_token(user_id, token)
+    await db.save_userbot_token(user_id, token)
+    #save_userbot_token(user_id, token)
     await message.reply("✅ Bot token saved successfully! Your bot is now connected.")
 
 def extract_token_from_message(text: str) -> str:
