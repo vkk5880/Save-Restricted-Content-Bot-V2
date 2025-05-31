@@ -89,6 +89,10 @@ mongo_app = pymongo.MongoClient(MONGODB_CONNECTION_STRING)
 mongo_db = mongo_app[DB_NAME]
 collection = mongo_db[COLLECTION_NAME]
 
+
+bot_client_pyro = None
+bot_client_tele = None
+
 async def fetch_upload_method(message, user_id):
     """Fetch the user's preferred upload method."""
     freecheck = await chk_user(message, user_id)
@@ -175,6 +179,18 @@ async def single_link(_, message):
         await message.reply(response_message)
         return
 
+
+
+    sessions = await db.get_sessions(user_id)
+    if not sessions or not sessions.get("userbot_token"):
+        if user_id not in OWNER_ID:
+            logger.warning(f"No userbot_token found for user {user_id}")
+            msg = await message.reply(
+                "⚠️ You need to set up your bot first. Please use /setbot.\n\n"
+                "💡 Tip: Set preferred file formats in /settings for automatic conversion."
+            )
+            return None
+
     # Add user to the loop
     users_loop[user_id] = True
 
@@ -185,6 +201,8 @@ async def single_link(_, message):
     print(f"upload_method ... {upload_methods}")
     telethon_userbot = None
     userbot = None
+    bot_client_pyro = await create_bot_client_pyro(user_id)
+    bot_client_tele = await create_bot_client_telethon(user_id)None
     if upload_methods == "Pyrogram":
         userbot = await initialize_userbot(user_id)
     elif upload_methods == "Telethon":
@@ -311,7 +329,51 @@ async def initialize_telethon_userbot(user_id):
 
 
 
+async def create_bot_client_pyro(user_id):
+    """Safely create and start a bot client with proper error handling"""
 
+    sessions = await db.get_sessions(user_id)
+    if not sessions or not sessions.get("userbot_token"):
+        logger.warning(f"No userbot_token found for user {user_id}")
+        return None
+    bot_token = sessions.get("userbot_token")
+    bot_client = Client(
+        name=":User_RestrictBot:",  # Session name
+        api_id=API_ID,         # Your API ID from my.telegram.org
+        api_hash=API_HASH,     # Your API Hash
+        bot_token=bot_token,   # The bot token from user
+        parse_mode=ParseMode.MARKDOWN
+    )
+    
+    try:
+        await bot_client.start()
+        logger.info(f"Bot client started successfully for token: {bot_token[:10]}...")
+        return bot_client
+    except Exception as e:
+        logger.error(f"Failed to start bot client: {e}")
+        await bot_client.stop()
+        raise RuntimeError(f"Could not start bot client: {str(e)}")
+
+
+
+async def create_bot_client_telethon(user_id):
+    """Safely create and start a bot client with proper error handling"""
+
+    sessions = await db.get_sessions(user_id)
+    if not sessions or not sessions.get("userbot_token"):
+        logger.warning(f"No userbot_token found for user {user_id}")
+        return None
+    bot_token = sessions.get("userbot_token")
+    telethon_user_client_bot = TelegramClient('user_bot_restricted_tele',api_id=API_ID,api_hash=API_HASH)
+    
+    try:
+        await telethon_user_client_bot.start((bot_token=bot_token))
+        logger.info(f"Bot client telethon_user_client_bot started successfully for token: {bot_token[:10]}...")
+        return bot_client
+    except Exception as e:
+        logger.error(f"Failed to start bot client telethon_user_client_bot: {e}")
+        await bot_client.stop()
+        raise RuntimeError(f"Could not start bot client telethon_user_client_bot: {str(e)}")
 
 async def initialize_userbot(user_id): # this ensure the single startup .. even if logged in or not
     """Initialize the userbot session for the given user."""
@@ -433,6 +495,17 @@ async def batch_link(_, message):
         await message.reply("Freemium service is currently not available. Upgrade to premium for access.")
         return
 
+
+    sessions = await db.get_sessions(user_id)
+    if not sessions or not sessions.get("userbot_token"):
+        if user_id not in OWNER_ID:
+            logger.warning(f"No userbot_token found for user {user_id}")
+            msg = await message.reply(
+                "⚠️ You need to set up your bot first. Please use /setbot.\n\n"
+                "💡 Tip: Set preferred file formats in /settings for automatic conversion."
+            )
+            return None
+    
     max_batch_size = FREEMIUM_LIMIT if freecheck == 1 else PREMIUM_LIMIT
 
     # Start link input
