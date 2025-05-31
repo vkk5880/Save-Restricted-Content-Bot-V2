@@ -62,6 +62,17 @@ async def set_session(user_id, session):
         upsert=True
     )
 
+
+async def save_userbot_token(user_id, token_string):
+    """Set save_userbot_token string in database"""
+    await db.update_one(
+        {"_id": user_id},
+        {"$set": {"userbot_token": token_string}},
+        upsert=True
+    )
+
+
+
 # Function to set Telethon session
 async def set_telethon_session(user_id, telethon_session_string):
     """Set Telethon session string in database"""
@@ -103,6 +114,7 @@ async def get_sessions(user_id):
 
         # Extract sessions
         sessions = {
+            "userbot_token": data.get("userbot_token"),
             "pyro_session": data.get("session"),
             "telethon_session": data.get("telethon_session_string"),
             "has_pyro": bool(data.get("session")),
