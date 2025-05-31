@@ -202,7 +202,7 @@ async def single_link(_, message):
     telethon_userbot = None
     userbot = None
     bot_client_pyro = await create_bot_client_pyro(user_id)
-    bot_client_tele = await create_bot_client_telethon(user_id)None
+    bot_client_tele = await create_bot_client_telethon(user_id)
     if upload_methods == "Pyrogram":
         userbot = await initialize_userbot(user_id)
     elif upload_methods == "Telethon":
