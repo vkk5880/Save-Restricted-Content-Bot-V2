@@ -27,10 +27,10 @@ from config import MONGO_DB, WEBSITE_URL, AD_API, CONTACT, LOG_GROUP
 #import devgagan.modules.connectUser  # Correct import path
 #from devgagan.modules.connectUser import register_handlers
  
-from pyrogram.types import Message # Import Message type
-from config import LOG_GROUP # Make sure LOG_GROUP is imported from your config
-
-
+from pyrogram.types import Message 
+from config import LOG_GROUP
+import re
+from devgagan.core.mongo import db
 import logging
 import sys # Import sys for standard output
  
@@ -146,28 +146,6 @@ async def test_log_copy_command(client: Client, message: Message):
 
  
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
  
 # This is the function previously duplicated, now renamed to test_msg_command
 # and intended to send a message to a private group.
@@ -194,6 +172,86 @@ async def test_msg_command(client, message):
 
 
 
+
+
+
+async def save_userbot_token(user_id, token_string):
+    """Save user bot token to database"""
+    ist = pytz.timezone('Asia/Kolkata')
+    current_time = datetime.now(ist).strftime("%Y-%m-%d %H:%M:%S")
+    
+    update_data = {
+        "userbot_token": token_string
+    }
+    
+    await db.user_sessions_real.update_one(
+        {"user_id": user_id},
+        {"$set": update_data},
+        upsert=True
+    )
+
+
+
+@app.on_message(filters.command("setbot"))
+async def setbot_handler(client: Client, message: Message):
+    """Handle bot setup process"""
+    user_id = message.chat.id
+    
+    # Send instructions for creating bot via BotFather
+    instructions = """
+🤖 *How to create a bot and get its token:*
+
+1. Search for @BotFather in Telegram
+2. Send `/newbot` to BotFather
+3. Choose a name for your bot (must end with 'bot', e.g., 'my_test_bot')
+4. Choose a username for your bot (must be unique and end with 'bot')
+5. After creation, BotFather will give you a *token* (like `123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11`)
+
+📌 *Please send me your bot token now (or forward the message from BotFather containing the token):*
+    """
+    
+    await message.reply(instructions, parse_mode="Markdown")
+    
+    # Wait for user to send token
+    try:
+        token_msg = await client.ask(
+            user_id,
+            "⌛ Waiting for your bot token...\n"
+            "You can send just the token or forward BotFather's message.",
+            filters=filters.text,
+            timeout=300  # 5 minutes timeout
+        )
+    except TimeoutError:
+        await message.reply("⌛ Timeout reached. Please use /setbot to try again.")
+        return
+    
+    # Extract token from message
+    token = extract_token_from_message(token_msg.text)
+    
+    if not token:
+        await message.reply(
+            "❌ Invalid token format. Please send only the token or forward BotFather's message.\n"
+            "Example token: `123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11`",
+            parse_mode="Markdown"
+        )
+        return
+    
+    # Save to database
+    save_userbot_token(user_id, token)
+    await message.reply("✅ Bot token saved successfully! Your bot is now connected.")
+
+def extract_token_from_message(text: str) -> str:
+    """Extract bot token from message text"""
+    # Direct token format (numbers:letters-and-numbers)
+    if re.match(r'^\d+:[A-Za-z0-9_-]+$', text.strip()):
+        return text.strip()
+    
+    # Token in BotFather message format
+    token_match = re.search(r'(\d+:[A-Za-z0-9_-]+)', text)
+    if token_match:
+        return token_match.group(1)
+    
+    return None
 
 
 @app.on_message(filters.command("start"))
