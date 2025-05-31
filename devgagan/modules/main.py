@@ -363,11 +363,11 @@ async def create_bot_client_telethon(user_id):
     if not sessions or not sessions.get("userbot_token"):
         logger.warning(f"No userbot_token found for user {user_id}")
         return None
-    bot_token = sessions.get("userbot_token")
+    bot_tokens = sessions.get("userbot_token")
     telethon_user_client_bot = TelegramClient('user_bot_restricted_tele',api_id=API_ID,api_hash=API_HASH)
     
     try:
-        await telethon_user_client_bot.start((bot_token=bot_token))
+        await telethon_user_client_bot.start(bot_token=bot_tokens)
         logger.info(f"Bot client telethon_user_client_bot started successfully for token: {bot_token[:10]}...")
         return bot_client
     except Exception as e:
