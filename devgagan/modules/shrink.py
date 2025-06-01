@@ -240,8 +240,8 @@ async def setbot_handler(client: Client, message: Message):
 
 1. Search for @BotFather in Telegram
 2. Send `/newbot` to BotFather
-3. Choose a name for your bot (must end with 'bot', e.g., 'my_test_bot')
-4. Choose a username for your bot (must be unique and end with 'bot')
+3. Choose a name for your bot (e.g., 'MY BOT')
+4. Choose a username for your bot (must be unique and end with 'bot', e.g., myuniquetestbot)
 5. After creation, BotFather will give you a *token* (like `123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11`)
 
 📌 *Please send me your bot token now (or forward the message from BotFather containing the token):*
@@ -276,7 +276,10 @@ async def setbot_handler(client: Client, message: Message):
     # Save to database
     await db.save_userbot_token(user_id, token)
     #save_userbot_token(user_id, token)
-    await message.reply("✅ Bot token saved successfully! Your bot is now connected.")
+    await message.reply("✅ Bot token saved successfully! Your bot is now connected.\n"
+                        "Go to the bot and start for receiving updates \n"
+                        "If you don't start the bot you can't receive files, media, audio and other updates"
+                       )
 
 def extract_token_from_message(text: str) -> str:
     """Extract bot token from message text"""
