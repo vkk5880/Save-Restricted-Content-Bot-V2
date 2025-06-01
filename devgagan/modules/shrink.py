@@ -152,13 +152,13 @@ bot_client_tele = None
 
 async def create_bot_client_pyro(user_id):
     """Safely create and start a bot client with proper error handling"""
-
+    global bot_client_pyro
     sessions = await db.get_sessions(user_id)
     if not sessions or not sessions.get("userbot_token"):
         logger.warning(f"No userbot_token found for user {user_id}")
         return None
     bot_tokens = sessions.get("userbot_token")
-    bot_client = Client(
+    bot_client_pyro = Client(
         name="f:User_RestrictBot_{user_id}:",  # Session name
         api_id=API_ID,         # Your API ID from my.telegram.org
         api_hash=API_HASH,     # Your API Hash
@@ -167,35 +167,33 @@ async def create_bot_client_pyro(user_id):
     )
     
     try:
-        await bot_client.start()
+        await bot_client_pyro.start()
         logger.info(f"Bot client started successfully for token: {bot_tokens[:10]}...")
-        bot_client_pyro = bot_client
-        return bot_client
+        return bot_client_pyro
     except Exception as e:
         logger.error(f"Failed to start bot client: {e}")
-        await bot_client.stop()
+        await bot_client_pyro.stop()
         raise RuntimeError(f"Could not start bot client: {str(e)}")
 
 
 
 async def create_bot_client_telethon(user_id):
     """Safely create and start a bot client with proper error handling"""
-
+    global bot_client_tele
     sessions = await db.get_sessions(user_id)
     if not sessions or not sessions.get("userbot_token"):
         logger.warning(f"No userbot_token found for user {user_id}")
         return None
     bot_tokens = sessions.get("userbot_token")
-    telethon_user_client_bot = TelegramClient(f"user_bot_restricted_tele_{user_id}",api_id=API_ID,api_hash=API_HASH)
+    bot_client_tele = TelegramClient(f"user_bot_restricted_tele_{user_id}",api_id=API_ID,api_hash=API_HASH)
     
     try:
-        await telethon_user_client_bot.start(bot_token=bot_tokens)
+        await bot_client_tele.start(bot_token=bot_tokens)
         logger.info(f"Bot client telethon_user_client_bot started successfully for token: {bot_tokens[:10]}...")
-        bot_client_tele = telethon_user_client_bot
-        return telethon_user_client_bot
+        return bot_client_tele
     except Exception as e:
         logger.error(f"Failed to start bot client telethon_user_client_bot: {e}")
-        await telethon_user_client_bot.stop()
+        await bot_client_tele.stop()
         raise RuntimeError(f"Could not start bot client telethon_user_client_bot: {str(e)}")
 
 
