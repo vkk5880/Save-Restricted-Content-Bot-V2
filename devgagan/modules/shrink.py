@@ -32,6 +32,7 @@ from config import LOG_GROUP
 import re
 from devgagan.core.mongo import db
 import logging
+from pyrogram.enums import ParseMode
 import sys # Import sys for standard output
 from pyrogram import filters, Client
 from telethon import TelegramClient
@@ -235,7 +236,7 @@ async def setbot_handler(client: Client, message: Message):
 📌 *Please send me your bot token now (or forward the message from BotFather containing the token):*
     """
     
-    await message.reply(instructions, parse_mode="Markdown")
+    await message.reply(instructions, parse_mode=ParseMode.MARKDOWN)
     
     # Wait for user to send token
     try:
@@ -257,7 +258,7 @@ async def setbot_handler(client: Client, message: Message):
         await message.reply(
             "❌ Invalid token format. Please send only the token or forward BotFather's message.\n"
             "Example token: `123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11`",
-            parse_mode="Markdown"
+            parse_mode=ParseMode.MARKDOWN
         )
         return
     
