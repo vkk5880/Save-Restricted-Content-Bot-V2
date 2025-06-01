@@ -150,6 +150,19 @@ collection = mongo_db[COLLECTION_NAME]
 bot_client_pyro = None
 bot_client_tele = None
 
+async def get_pyro_bot(user_id=None):
+    global bot_client_pyro
+    if bot_client_pyro is None and user_id:
+        bot_client_pyro = await create_bot_client_pyro(user_id)
+    return bot_client_pyro
+
+async def get_tele_bot(user_id=None):
+    global bot_client_tele
+    if bot_client_tele is None and user_id:
+        bot_client_tele = await create_bot_client_telethon(user_id)
+    return bot_client_tele
+
+
 async def create_bot_client_pyro(user_id):
     """Safely create and start a bot client with proper error handling"""
     global bot_client_pyro
