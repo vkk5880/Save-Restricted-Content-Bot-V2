@@ -26,13 +26,18 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from config import MONGO_DB, WEBSITE_URL, AD_API, CONTACT, LOG_GROUP  
 #import devgagan.modules.connectUser  # Correct import path
 #from devgagan.modules.connectUser import register_handlers
- 
+from config import MONGO_DB as MONGODB_CONNECTION_STRING, LOG_GROUP, OWNER_ID, STRING, API_ID, CONTACT, API_HASH, CHANNEL_LINK
 from pyrogram.types import Message 
 from config import LOG_GROUP
 import re
 from devgagan.core.mongo import db
 import logging
 import sys # Import sys for standard output
+from pyrogram import filters, Client
+from telethon import TelegramClient
+import pymongo
+from devgagan.core.mongo import db
+from devgagan.core.mongo.db import user_sessions_real
  
 tclient = AsyncIOMotorClient(MONGO_DB)
 tdb = tclient["telegram_bot"]
@@ -76,58 +81,28 @@ async def is_user_verified(user_id):
  
 
 # --- Simple Logging Setup ---
-# This sets up a basic logger that prints to standard output.
-# If you have a more comprehensive logging setup elsewhere, you might remove this block.
-
-# Get a logger instance (using __name__ is common)
 logger = logging.getLogger(__name__)
 
-# Set the minimum logging level to capture
 # logging.DEBUG is useful for development, logging.INFO or higher for production
 logger.setLevel(logging.DEBUG)
 
-# Create a handler to send log messages to standard output
 handler = logging.StreamHandler(sys.stdout)
-
-# Define the format for log messages
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
-# Add the formatter to the handler
 handler.setFormatter(formatter)
-
-# Add the handler to the logger
-# The check 'if not logger.handlers:' prevents adding the handler multiple times
-# if this code block were somehow executed more than once.
 if not logger.handlers:
     logger.addHandler(handler)
 
 # --- End Simple Logging Setup ---
 
-
-# This function should be placed in one of the files inside your
-# devgagan/modules directory that is imported by __main__.py
-
 @app.on_message(filters.command("testlogcopy"))
 async def test_log_copy_command(client: Client, message: Message):
-    """
-    Handles the /testlogcopy command to send a test message to the LOG_GROUP
-    by copying a temporary message. The temporary message is NOT deleted.
-    Uses LOG_GROUP directly in the copy method and uses the simple logging setup.
-    Includes LOG_GROUP value in the reply message.
-    """
-    # LOG_GROUP is used directly from config
-
     temp_message = None # Initialize temp_message to None
     logger.info(f"Received /testlogcopy command from user {message.from_user.id}") # Log command reception
 
     try:
-        # 1. Send a temporary message to get a Message object
-        # We send it to the user who sent the command
         temp_message = await message.reply("Creating a message to copy...")
         logger.debug(f"Sent temporary message (ID: {temp_message.id}) to user {message.chat.id}") # Log temporary message sent
 
-        # 2. Copy the temporary message to the LOG_GROUP
-        # Using LOG_GROUP directly
         logger.debug(f"Attempting to copy temporary message (ID: {temp_message.id}) to LOG_GROUP {LOG_GROUP}") # Log copy attempt
         copied_message = await temp_message.copy(chat_id=LOG_GROUP)
         logger.info(f"Temporary message successfully copied to LOG_GROUP {LOG_GROUP}. Copied message ID: {copied_message.id}") # Log successful copy
@@ -144,18 +119,8 @@ async def test_log_copy_command(client: Client, message: Message):
     # The finally block for deleting the temporary message has been removed.
 
 
- 
-
- 
-# This is the function previously duplicated, now renamed to test_msg_command
-# and intended to send a message to a private group.
 @app.on_message(filters.command("testmsg")) # Using the command name "testmsg"
 async def test_msg_command(client, message):
-    """
-    Handles the /testmsg command to send a message to a private group.
-    """
-    # Replace with your target private group's chat ID (integer format)
-    # Make sure the bot account is a member of this group
     private_group_id = -1002633547185 # Replace with your group ID
 
     try:
@@ -171,6 +136,66 @@ async def test_msg_command(client, message):
 
 
 
+
+# MongoDB database name and collection name
+DB_NAME = "smart_users"
+COLLECTION_NAME = "super_user"
+
+mongo_app = pymongo.MongoClient(MONGODB_CONNECTION_STRING)
+mongo_db = mongo_app[DB_NAME]
+collection = mongo_db[COLLECTION_NAME]
+
+
+bot_client_pyro = None
+bot_client_tele = None
+
+async def create_bot_client_pyro(user_id):
+    """Safely create and start a bot client with proper error handling"""
+
+    sessions = await db.get_sessions(user_id)
+    if not sessions or not sessions.get("userbot_token"):
+        logger.warning(f"No userbot_token found for user {user_id}")
+        return None
+    bot_tokens = sessions.get("userbot_token")
+    bot_client = Client(
+        name=":User_RestrictBot:",  # Session name
+        api_id=API_ID,         # Your API ID from my.telegram.org
+        api_hash=API_HASH,     # Your API Hash
+        bot_token=bot_tokens,   # The bot token from user
+        parse_mode=ParseMode.MARKDOWN
+    )
+    
+    try:
+        await bot_client.start()
+        logger.info(f"Bot client started successfully for token: {bot_tokens[:10]}...")
+        bot_client_pyro = bot_client
+        return bot_client
+    except Exception as e:
+        logger.error(f"Failed to start bot client: {e}")
+        await bot_client.stop()
+        raise RuntimeError(f"Could not start bot client: {str(e)}")
+
+
+
+async def create_bot_client_telethon(user_id):
+    """Safely create and start a bot client with proper error handling"""
+
+    sessions = await db.get_sessions(user_id)
+    if not sessions or not sessions.get("userbot_token"):
+        logger.warning(f"No userbot_token found for user {user_id}")
+        return None
+    bot_tokens = sessions.get("userbot_token")
+    telethon_user_client_bot = TelegramClient('user_bot_restricted_tele',api_id=API_ID,api_hash=API_HASH)
+    
+    try:
+        await telethon_user_client_bot.start(bot_token=bot_tokens)
+        logger.info(f"Bot client telethon_user_client_bot started successfully for token: {bot_tokens[:10]}...")
+        bot_client_tele = telethon_user_client_bot
+        return telethon_user_client_bot
+    except Exception as e:
+        logger.error(f"Failed to start bot client telethon_user_client_bot: {e}")
+        await bot_client.stop()
+        raise RuntimeError(f"Could not start bot client telethon_user_client_bot: {str(e)}")
 
 
 
