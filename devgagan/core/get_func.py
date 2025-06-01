@@ -220,7 +220,7 @@ async def get_msg_telethon(telethon_userbot, sender, edit_id, msg_link, i, messa
 
         result = None
         if isinstance(msg.media, types.MessageMediaPhoto):
-            if user_id not in OWNER_ID:
+            if sender not in OWNER_ID:
                 result = await bot_client_tele.send_photo(target_chat_id, file, caption=caption, reply_to_message_id=topic_id)
 
             else:
@@ -270,7 +270,7 @@ async def upload_media_telethon(sender, target_chat_id, file, caption, topic_id)
         progress_message = await gf.send_message(sender, "**__Uploading...__**")
 
         bot_client = gf
-        if user_id not in OWNER_ID:
+        if sender not in OWNER_ID:
             bot_client = bot_client_tele
         # Upload with floodwait handling
         try:
@@ -517,7 +517,7 @@ async def upload_media(sender, target_chat_id, file, caption, edit, topic_id):
         file_extension = file.split('.')[-1].lower()
 
         bot_client = app
-        if user_id not in OWNER_ID:
+        if sender not in OWNER_ID:
             bot_client = bot_client_pyro
         # Check file format and upload accordingly
         if file_extension in video_formats:
@@ -535,11 +535,23 @@ async def upload_media(sender, target_chat_id, file, caption, edit, topic_id):
                 progress=progress_bar,
                 progress_args=("╭─────────────────────╮\n│      **__Pyro Uploader__**\n├─────────────────────", edit, time.time())
             )
-            await dm.copy(LOG_GROUP) # Copy to log group
+            if bot_client == app:
+                await dm.copy(LOG_GROUP) # Copy to log group
+
+            else:
+                try:
+                    await app.copy_message(chat_id=LOG_GROUP,
+                                           from_chat_id=dm.chat.id,
+                                           message_id=dm.id,
+                                           )
+                    
+                except Exception as e:
+                    logger.error(f"Copy failed: {e}")
+            #await dm.copy(LOG_GROUP) # Copy to log group
 
         elif file_extension in image_formats:
             # Correctly indented block for image upload
-            dm = await app.send_photo(
+            dm = await bot_client.send_photo(
                 chat_id=target_chat_id,
                 photo=file,
                 caption=caption,
@@ -548,11 +560,23 @@ async def upload_media(sender, target_chat_id, file, caption, edit, topic_id):
                 reply_to_message_id=topic_id,
                 progress_args=("╭─────────────────────╮\n│      **__Pyro Uploader__**\n├─────────────────────", edit, time.time())
             )
-            await dm.copy(LOG_GROUP) # Copy to log group
+            if bot_client == app:
+                await dm.copy(LOG_GROUP) # Copy to log group
+
+            else:
+                try:
+                    await app.copy_message(chat_id=LOG_GROUP,
+                                           from_chat_id=dm.chat.id,
+                                           message_id=dm.id,
+                                           )
+                    
+                except Exception as e:
+                    logger.error(f"Copy failed: {e}")
+            #await dm.copy(LOG_GROUP) # Copy to log group
 
         else:
             # Correctly indented block for document upload (covers other formats)
-            dm = await app.send_document(
+            dm = await bot_client.send_document(
                 chat_id=target_chat_id,
                 document=file,
                 caption=caption,
