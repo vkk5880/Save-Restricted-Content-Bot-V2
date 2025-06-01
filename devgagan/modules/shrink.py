@@ -159,7 +159,7 @@ async def create_bot_client_pyro(user_id):
         return None
     bot_tokens = sessions.get("userbot_token")
     bot_client = Client(
-        name=":User_RestrictBot:",  # Session name
+        name="f:User_RestrictBot_{user_id}:",  # Session name
         api_id=API_ID,         # Your API ID from my.telegram.org
         api_hash=API_HASH,     # Your API Hash
         bot_token=bot_tokens,   # The bot token from user
@@ -186,7 +186,7 @@ async def create_bot_client_telethon(user_id):
         logger.warning(f"No userbot_token found for user {user_id}")
         return None
     bot_tokens = sessions.get("userbot_token")
-    telethon_user_client_bot = TelegramClient('user_bot_restricted_tele',api_id=API_ID,api_hash=API_HASH)
+    telethon_user_client_bot = TelegramClient(f"user_bot_restricted_tele_{user_id}",api_id=API_ID,api_hash=API_HASH)
     
     try:
         await telethon_user_client_bot.start(bot_token=bot_tokens)
@@ -195,7 +195,7 @@ async def create_bot_client_telethon(user_id):
         return telethon_user_client_bot
     except Exception as e:
         logger.error(f"Failed to start bot client telethon_user_client_bot: {e}")
-        await bot_client.stop()
+        await telethon_user_client_bot.stop()
         raise RuntimeError(f"Could not start bot client telethon_user_client_bot: {str(e)}")
 
 
