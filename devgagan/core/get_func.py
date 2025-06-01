@@ -45,7 +45,7 @@ from devgagan.core.mongo.db import set_session, remove_session, get_data
 from devgagantools import fast_upload as fast_uploads
 #from devgagantools import fast_download
 from devgagan.core.func import *
-from devgagan.modules.shrink import is_user_verified, bot_client_pyro, bot_client_tele
+from devgagan.modules.shrink import is_user_verified, get_pyro_bot, get_tele_bot
 from telethon import TelegramClient, events, Button
 from devgagan import app
 from devgagan import telethon_user_client  as gf
@@ -221,6 +221,7 @@ async def get_msg_telethon(telethon_userbot, sender, edit_id, msg_link, i, messa
         result = None
         if isinstance(msg.media, types.MessageMediaPhoto):
             if sender not in OWNER_ID:
+                bot_client_tele = await get_tele_bot()
                 result = await bot_client_tele.send_photo(target_chat_id, file, caption=caption, reply_to_message_id=topic_id)
 
             else:
@@ -271,7 +272,7 @@ async def upload_media_telethon(sender, target_chat_id, file, caption, topic_id)
 
         bot_client = gf
         if sender not in OWNER_ID:
-            bot_client = bot_client_tele
+            bot_client = await get_tele_bot()
         # Upload with floodwait handling
         try:
             uploaded = await fast_uploads(
@@ -518,7 +519,7 @@ async def upload_media(sender, target_chat_id, file, caption, edit, topic_id):
 
         bot_client = app
         if sender not in OWNER_ID:
-            bot_client = bot_client_pyro
+            bot_client = await get_pyro_bot()
         # Check file format and upload accordingly
         if file_extension in video_formats:
             # Correctly indented block for video upload
