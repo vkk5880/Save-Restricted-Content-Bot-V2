@@ -238,8 +238,8 @@ async def batch_download_command(_, message: Message):
             if await upload_media_telethondl(
                 message.chat.id,
                 message.chat.id,
-                file=dl_file_path,
-                caption=title,
+                dl_file_path,
+                title,
                 topic_id
             ):
                 success_count += 1
