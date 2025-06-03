@@ -3,7 +3,7 @@ import re
 import aiohttp
 import asyncio
 from devgagan import app
-from devgagan.core.get_func import upload_media_telethon
+from devgagan.core.get_func import upload_media_telethondl
 from pyrogram import Client, filters
 from pyrogram.types import Message
 from bs4 import BeautifulSoup
@@ -235,7 +235,7 @@ async def batch_download_command(_, message: Message):
             if message.reply_to_message and message.reply_to_message.forum_topic_created:
                 topic_id = message.reply_to_message.message_thread_id
             
-            if await upload_media_telethon(
+            if await upload_media_telethondl(
                 message.chat.id,
                 message.chat.id,
                 file=dl_file_path,
