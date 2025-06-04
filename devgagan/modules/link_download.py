@@ -117,7 +117,7 @@ def format_entry(entry, index, common_title=None):
         f"┣⪼{'𝑽𝒊𝒅𝒆𝒐' if file_type == 'Video' else '𝑫𝒐𝒄𝒖𝒎𝒆𝒏𝒕'} 𝑻𝒊𝒕𝒍𝒆 : {title}\n\n"
         f"✨𝑩𝒂𝒕𝒄𝒉 𝑵𝒂𝒎𝒆: {common_title or 'No Batch'}\n"
         f"📅 𝑫𝒂𝒕𝒆: {date}\n"
-        f"🔗 𝑼𝑹𝑳: {url}\n"
+        #f"🔗 𝑼𝑹𝑳: {url}\n"
         f"╰━━━━━━━━━━━━━ ❀° ━━━╯\n"
     )
 
@@ -158,8 +158,8 @@ async def batch_download_command(client, message: Message):
         return
     
     # Ask for common title if no titles found
-    common_title = None
-    if not any(entry['title'] for entry in entries):
+    common_title = os.path.splitext(file_name)[0]
+    """if not any(entry['title'] for entry in entries):
         try:
             title_msg = await client.ask(
                 message.chat.id,
@@ -169,7 +169,7 @@ async def batch_download_command(client, message: Message):
             common_title = title_msg.text
         except asyncio.TimeoutError:
             common_title = "Untitled"
-    
+    """
     # Process links one by one
     success_count = 0
     failed_entries = []
