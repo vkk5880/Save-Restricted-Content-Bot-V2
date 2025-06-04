@@ -160,6 +160,137 @@ async def upload_media_telethons(sender, target_chat_id, file, caption, topic_id
 
 
 
+import asyncio
+import os
+from pyrogram.types import Message
+from pyrogram import filters
+
+@app.on_message(filters.command("batchhtml") & filters.private)
+async def batch_download_command(_, message: Message):
+    # Ask user to send the HTML file
+    status_msg = await message.reply_text("Please send me the HTML file within the next 3 minutes.")
+    
+    try:
+        # Wait for the user to send a document within 3 minutes (180 seconds)
+        file_message = await message.chat.ask(
+            filters.document,
+            timeout=180,
+            user_id=message.from_user.id
+        )
+    except asyncio.TimeoutError:
+        await status_msg.edit_text("Timed out waiting for the file. Please try again.")
+        return
+    
+    # Check if the received file is an HTML file
+    file_name = file_message.document.file_name.lower()
+    if not file_name.endswith('.html'):
+        await status_msg.edit_text("Please provide an HTML file.")
+        return
+    
+    await status_msg.edit_text("Downloading your file...")
+    file_path = await file_message.download(file_name="links_file.html")
+    
+    await status_msg.edit_text("Extracting video links from file...")
+    video_entries = await extract_video_links_from_html(file_path)
+    
+    if not video_entries:
+        await status_msg.edit_text("No video links found in the HTML file.")
+        os.remove(file_path)
+        return
+    
+    await status_msg.edit_text(f"Found {len(video_entries)} video lectures. Starting download...")
+    
+    success_count = 0
+    failed_entries = []
+    
+    for i, entry in enumerate(video_entries, 1):
+        try:
+            title = entry["title"]
+            url = entry["url"]
+            
+            title_msg = await message.reply_text(f"Downloading: {title}\nURL: {url}")
+            
+            # Create downloads directory if it doesn't exist
+            os.makedirs("downloads", exist_ok=True)
+            
+            # Generate filename from title (sanitize it)
+            safe_title = "".join(c if c.isalnum() else "_" for c in title)[:100]
+            dl_file_path = f"downloads/{message.from_user.id}_{i}_{safe_title}.mp4"
+            
+            await status_msg.edit_text(f"Downloading {i}/{len(video_entries)}: {title}")
+            
+            # Use ffmpeg for HLS streams if available
+            if url.endswith('.m3u8'):
+                try:
+                    cmd = [
+                        "ffmpeg",
+                        "-i", url,
+                        "-c", "copy",
+                        "-bsf:a", "aac_adtstoasc",
+                        dl_file_path
+                    ]
+                    proc = await asyncio.create_subprocess_exec(*cmd)
+                    await proc.wait()
+                    
+                    if proc.returncode != 0:
+                        raise Exception("FFmpeg failed")
+                except Exception as e:
+                    print(f"FFmpeg error: {e}")
+                    if await download_file(url, dl_file_path):
+                        pass  # Fallback succeeded
+                    else:
+                        raise
+            else:
+                if not await download_file(url, dl_file_path):
+                    raise Exception("Download failed")
+            
+            # Upload to Telegram
+            await status_msg.edit_text(f"Uploading {i}/{len(video_entries)}: {title}")
+            
+            topic_id = None
+            if file_message.reply_to_message and file_message.reply_to_message.forum_topic_created:
+                topic_id = file_message.reply_to_message.message_thread_id
+            
+            if await upload_media_telethondl(
+                message.chat.id,
+                message.chat.id,
+                dl_file_path,
+                title,
+                topic_id
+            ):
+                success_count += 1
+            else:
+                failed_entries.append(f"{title} - {url}")
+            
+            # Clean up
+            if os.path.exists(dl_file_path):
+                os.remove(dl_file_path)
+            
+            await title_msg.delete()
+            
+        except Exception as e:
+            print(f"Error processing {entry.get('title', '')}: {e}")
+            failed_entries.append(f"{entry.get('title', 'Unknown')} - {entry.get('url', '')}")
+    
+    # Clean up
+    os.remove(file_path)
+    
+    # Send final status
+    result_text = f"Processed {len(video_entries)} video lectures.\nSuccess: {success_count}\nFailed: {len(failed_entries)}"
+    if failed_entries:
+        result_text += "\n\nFailed lectures:\n" + "\n".join(failed_entries[:5])  # Show first 5 failed
+        if len(failed_entries) > 5:
+            result_text += f"\n...and {len(failed_entries)-5} more"
+    
+    await status_msg.edit_text(result_text)
+
+
+
+
+
+
+
+
 @app.on_message(filters.command("batchdl") & filters.private)
 async def batch_download_command(_, message: Message):
     if not message.reply_to_message or not message.reply_to_message.document:
