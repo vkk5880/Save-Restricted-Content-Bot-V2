@@ -59,7 +59,8 @@ def extract_links_from_file(file_path):
     # Title:https://url
     # or just https://url
     #pattern = r'(?:([^:\n]+):)?(https?://[^\s]+)'
-    pattern = r'(?:(.+?):)?(https?://[^\s]+)'
+    #pattern = r'(?:(.+?):)?(https?://[^\s]+)'
+    pattern = r'^(.*?)\s*:\s*(https?://[^\s]+)$'
     matches = re.findall(pattern, content)
     
     entries = []
@@ -99,7 +100,7 @@ async def download_mufile(url, file_path):
 
 # Format message as requested
 def format_entry(entry, index, common_title=None):
-    title = entry['title'] or common_title or "Untitled"
+    title = entry['title'] or "Untitled"
     url = entry['url']
     
     # Extract date from URL if available (looking for patterns like /2024-08-09-)
