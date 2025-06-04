@@ -60,8 +60,8 @@ def extract_links_from_file(file_path):
     # or just https://url
     #pattern = r'(?:([^:\n]+):)?(https?://[^\s]+)'
     #pattern = r'(?:(.+?):)?(https?://[^\s]+)'
-    pattern = r'^(.*?)\s*:\s*(https?://[^\s]+)$'
-    matches = re.findall(pattern, content)
+    pattern = r'^(?:(.*?)\s*:\s*)?(https?://[^\s]+)$'
+    matches = re.findall(pattern, content, re.MULTILINE)
     
     entries = []
     for title, url in matches:
