@@ -470,3 +470,109 @@ async def batch_download_command(_, message: Message):
             result_text += f"\n...and {len(failed_entries)-5} more"
     
     await status_msg.edit_text(result_text)
+
+
+
+
+
+
+import tempfile
+
+@app.on_message(filters.command("htmltotxt") & filters.private)
+async def html_to_text_command(client, message: Message):
+    # Ask user to send the HTML file
+    status_msg = await message.reply_text("Please send me the HTML file containing links.")
+    
+    try:
+        # Wait for the user to send a document
+        file_message = await client.ask(
+            message.chat.id,
+            "Please upload the HTML file now.",
+            filters=filters.document,
+            timeout=180
+        )
+    except asyncio.TimeoutError:
+        await status_msg.edit_text("Timed out waiting for the file. Please try again.")
+        return
+    
+    # Check if the file is HTML
+    file_name = file_message.document.file_name.lower()
+    if not file_name.endswith('.html'):
+        await status_msg.edit_text("Please provide an HTML file.")
+        return
+    
+    # Download the file
+    await status_msg.edit_text("Downloading your file...")
+    file_path = await file_message.download(file_name="temp_html_file.html")
+    
+    # Extract links and titles
+    await status_msg.edit_text("Extracting links and titles...")
+    
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            html_content = f.read()
+        
+        # Pattern to match both regular links and onclick links
+        pattern = r'<a\s+(?:[^>]*?\s+)?(?:href="([^"]*)"|onclick="playVideo\(\'([^\']*)\'\))[^>]*>(.*?)<\/a>'
+        matches = re.findall(pattern, html_content, re.DOTALL)
+        
+        extracted_links = []
+        
+        for match in matches:
+            # Get URL from either href or onclick
+            url = match[0] if match[0] else match[1]
+            title = match[2].strip()
+            
+            # Clean up title - remove HTML tags and extra whitespace
+            title = re.sub(r'<[^>]+>', '', title)
+            title = re.sub(r'\s+', ' ', title).strip()
+            
+            if url and title:
+                extracted_links.append(f"{title}: {url}")
+        
+        if not extracted_links:
+            await status_msg.edit_text("No links found in the HTML file.")
+            os.remove(file_path)
+            return
+
+        txt_file_name = os.path.splitext(file_name)[0] + ".txt"
+        with open(txt_file_name, "w", encoding="utf-8") as txt_file:
+            txt_file.write("\n\n".join(extracted_links))
+            
+        # Send the file to the user
+        await message.reply_document(txt_file_name, caption=f"Successfully extracted {len(extracted_links)} links.")
+        await status_msg.delete()
+        
+        """# Combine all links into a text message
+        result_text = "Extracted Links:\n\n" + "\n\n".join(extracted_links)
+        
+        # Split long messages to avoid Telegram's message length limit
+        max_length = 4000
+        if len(result_text) > max_length:
+            parts = [result_text[i:i+max_length] for i in range(0, len(result_text), max_length)]
+            for part in parts:
+                await message.reply_text(part)
+                await asyncio.sleep(1)  # Avoid flooding
+        else:
+            await message.reply_text(result_text)
+        
+        await status_msg.edit_text(f"Successfully extracted {len(extracted_links)} links!")"""
+    
+    except Exception as e:
+        await message.reply_text(f"Error processing file: {str(e)}")
+    finally:
+        # Clean up
+        if os.path.exists(txt_file_name):
+            os.remove(txt_file_name)
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
+
+# Example usage:
+# User sends: /htmltotxt
+# Bot replies: "Please send me the HTML file containing links."
+# User uploads HTML file
+# Bot processes and replies with all extracted links in format:
+# Title: URL
+# Title: URL
+# ...
