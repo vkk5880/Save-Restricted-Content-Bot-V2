@@ -48,117 +48,6 @@ async def extract_video_links_from_html(file_path):
     
     return video_links
 
-async def upload_media_pyrogram(client, chat_id, file_path, caption, message_thread_id=None):
-    try:
-        ext = os.path.splitext(file_path)[1].lower()
-        
-        if ext in ('.mp4', '.mov', '.mkv', '.webm'):
-            await client.send_video(
-                chat_id=chat_id,
-                video=file_path,
-                caption=caption,
-                reply_to_message_id=message_thread_id
-            )
-        else:
-            await client.send_document(
-                chat_id=chat_id,
-                document=file_path,
-                caption=caption,
-                reply_to_message_id=message_thread_id
-            )
-        return True
-    except Exception as e:
-        print(f"Error uploading file: {e}")
-        return False
-
-
-
-async def upload_media_telethons(sender, target_chat_id, file, caption, topic_id):
-    try:
-        print("UPLOADING MEDIA TELETHON")
-        # Get file metadata
-        metadata = video_metadata(file)
-        width, height, duration = metadata['width'], metadata['height'], metadata['duration']
-        thumb_path = await screenshot(file, duration, sender)
-
-        video_formats = {'mp4', 'mkv', 'avi', 'mov'}
-        document_formats = {'pdf', 'docx', 'txt', 'epub'}
-        image_formats = {'jpg', 'png', 'jpeg'}
-
-        # Delete the edit message since we'll use our own progress
-        #await edit.delete()
-        progress_message = await gf.send_message(sender, "**__Uploading...__**")
-
-        # Upload with floodwait handling
-        try:
-            uploaded = await fast_uploads(
-                gf, file,
-                reply=progress_message,
-                name=None,
-                progress_bar_function=lambda done, total: progress_callback(done, total, sender)
-            )
-        except FloodWaitError as fw:
-            await progress_message.edit(f"⏳ FloodWait: Sleeping for {fw.seconds} seconds...")
-            await asyncio.sleep(fw.seconds)
-            # Retry after floodwait
-            uploaded = await fast_upload(
-                gf, file,
-                reply=progress_message,
-                name=None,
-                progress_bar_function=lambda done, total: progress_callback(done, total, sender)
-            )
-
-        await progress_message.delete()
-
-        # Prepare attributes based on file type
-        attributes = []
-        if file.split('.')[-1].lower() in video_formats:
-            attributes.append(DocumentAttributeVideo(
-                duration=duration,
-                w=width,
-                h=height,
-                supports_streaming=True
-            ))
-
-        # Send to target chat
-        await gf.send_file(
-            target_chat_id,
-            uploaded,
-            caption=caption,
-            attributes=attributes,
-            reply_to=topic_id,
-            thumb=thumb_path
-        )
-
-        # Send to log group
-        await gf.send_file(
-            LOG_GROUP,
-            uploaded,
-            caption=caption,
-            attributes=attributes,
-            thumb=thumb_path
-        )
-        return True
-
-    except Exception as e:
-        await gf.send_message(LOG_GROUP, f"**Upload Failed:** {str(e)}")
-        print(f"Error during media upload: {e}")
-        raise  # Re-raise the exception for higher level handling
-        return False
-
-    finally:
-        # Cleanup
-        if thumb_path and os.path.exists(thumb_path):
-            os.remove(thumb_path)
-        if 'progress_message' in locals():
-            try:
-                await progress_message.delete()
-            except:
-                pass
-        #gc.collect()
-        #return False
-
-
 
 
 # Helper function to extract links and titles from file
@@ -199,7 +88,7 @@ async def download_mufile(url, file_path):
             return proc.returncode == 0
         else:
             # For regular files
-            if not await download_file(url, dl_file_path):
+            if not await download_file(url, file_path):
                 raise Exception("Download failed")
                 return False
             return True
@@ -313,7 +202,7 @@ async def batch_download_command(client, message: Message):
                 if file_message.reply_to_message and file_message.reply_to_message.forum_topic_created:
                     topic_id = file_message.reply_to_message.message_thread_id
 
-                if await upload_media_telethondl(message.chat.id, message.chat.id, dl_file_path, title, topic_id):
+                if await upload_media_telethondl(message.chat.id, message.chat.id, dl_file_path, formatted_msg, topic_id):
                     success_count += 1
                 else:
                     failed_entries.append(f"{title} - {url}")
