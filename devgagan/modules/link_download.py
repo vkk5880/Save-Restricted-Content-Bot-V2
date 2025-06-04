@@ -3,7 +3,7 @@ import re
 import aiohttp
 import asyncio
 from devgagan import app
-#from devgagan.core.get_func import upload_media_telethondl
+from devgagan.core.get_func import upload_media_telethondl
 from pyrogram import Client, filters
 from pyrogram.types import Message
 from bs4 import BeautifulSoup
