@@ -10,7 +10,7 @@ from bs4 import BeautifulSoup
 from urllib.parse import urlparse
 from devgagan import telethon_user_client  as gf
 from devgagantools import fast_upload as fast_uploads
-
+from datetime import datetime
 
 
 async def download_file(url, file_path):
@@ -160,10 +160,193 @@ async def upload_media_telethons(sender, target_chat_id, file, caption, topic_id
 
 
 
-import asyncio
-import os
-from pyrogram.types import Message
-from pyrogram import filters
+
+# Helper function to extract links and titles from file
+def extract_links_from_file(file_path):
+    with open(file_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    
+    # Pattern to match both formats:
+    # Title:https://url
+    # or just https://url
+    pattern = r'(?:([^:\n]+):)?(https?://[^\s]+)'
+    matches = re.findall(pattern, content)
+    
+    entries = []
+    for title, url in matches:
+        # Clean up title if it exists
+        if title:
+            title = title.strip()
+        entries.append({'title': title, 'url': url})
+    
+    return entries
+
+# Helper function to download files
+async def download_mufile(url, file_path):
+    try:
+        # Use appropriate download method based on file type
+        if url.endswith('.m3u8'):
+            # For HLS streams
+            cmd = [
+                "ffmpeg",
+                "-i", url,
+                "-c", "copy",
+                "-bsf:a", "aac_adtstoasc",
+                file_path
+            ]
+            proc = await asyncio.create_subprocess_exec(*cmd)
+            await proc.wait()
+            return proc.returncode == 0
+        else:
+            # For regular files
+            if not await download_file(url, dl_file_path):
+                raise Exception("Download failed")
+                return False
+            return True
+    except Exception as e:
+        print(f"Download error: {e}")
+        return False
+
+# Format message as requested
+def format_entry(entry, index, common_title=None):
+    title = entry['title'] or common_title or "Untitled"
+    url = entry['url']
+    
+    # Extract date from URL if available (looking for patterns like /2024-08-09-)
+    date_match = re.search(r'/(\d{4}-\d{2}-\d{2})-', url)
+    date = date_match.group(1) if date_match else datetime.now().strftime("%Y-%m-%d")
+    
+    # Determine if it's a video or document
+    if url.endswith('.pdf'):
+        file_type = "Document"
+    else:
+        file_type = "Video"
+    
+    return (
+        f"✯ ━━━━❀°𝑳𝒊𝒏𝒌 𝑰𝒅: {index:02d}°❀ ━━━━ ✯\n"
+        f"╭━━━━━━━━━━━━━ ❀° ━━━╮\n"
+        f"┣⪼{'𝑽𝒊𝒅𝒆𝒐' if file_type == 'Video' else '𝑫𝒐𝒄𝒖𝒎𝒆𝒏𝒕'} 𝑻𝒊𝒕𝒍𝒆 : {title}\n\n"
+        f"✨𝑩𝒂𝒕𝒄𝒉 𝑵𝒂𝒎𝒆: {common_title or 'No Batch'}\n"
+        f"📅 𝑫𝒂𝒕𝒆: {date}\n"
+        f"🔗 𝑼𝑹𝑳: {url}\n"
+        f"╰━━━━━━━━━━━━━ ❀° ━━━╯\n"
+    )
+
+@app.on_message(filters.command("batchtxt") & filters.private)
+async def batch_download_command(client, message: Message):
+    # Ask user to send the file
+    status_msg = await message.reply_text("Please send me the HTML or text file containing links.")
+    
+    try:
+        # Wait for the user to send a document
+        file_message = await client.ask(
+            message.chat.id,
+            "Please upload the file now.",
+            filters=filters.document,
+            timeout=180
+        )
+    except asyncio.TimeoutError:
+        await status_msg.edit_text("Timed out waiting for the file. Please try again.")
+        return
+    
+    # Check if the file is HTML or text
+    file_name = file_message.document.file_name.lower()
+    if not (file_name.endswith('.html') or file_name.endswith('.txt')):
+        await status_msg.edit_text("Please provide an HTML or text file.")
+        return
+    
+    # Download the file
+    await status_msg.edit_text("Downloading your file...")
+    file_path = await file_message.download(file_name="links_file")
+    
+    # Extract links
+    await status_msg.edit_text("Extracting links from file...")
+    entries = extract_links_from_file(file_path)
+    
+    if not entries:
+        await status_msg.edit_text("No links found in the file.")
+        os.remove(file_path)
+        return
+    
+    # Ask for common title if no titles found
+    common_title = None
+    if not any(entry['title'] for entry in entries):
+        try:
+            title_msg = await client.ask(
+                message.chat.id,
+                "No titles found in the file. Please enter a common title for all links:",
+                timeout=60
+            )
+            common_title = title_msg.text
+        except asyncio.TimeoutError:
+            common_title = "Untitled"
+    
+    # Process links one by one
+    success_count = 0
+    failed_entries = []
+    
+    for i, entry in enumerate(entries, 1):
+        try:
+            # Format and send the message
+            formatted_msg = format_entry(entry, i, common_title)
+            #await message.reply_text(formatted_msg)
+            
+            # Download the file
+            url = entry['url']
+            title = entry['title'] or common_title or f"File_{i}"
+            
+            # Create downloads directory if it doesn't exist
+            os.makedirs("downloads", exist_ok=True)
+            
+            # Generate safe filename
+            safe_title = "".join(c if c.isalnum() else "_" for c in title)[:100]
+            ext = '.mp4' if not url.endswith('.pdf') else '.pdf'
+            dl_file_path = f"downloads/{message.from_user.id}_{i}_{safe_title}{ext}"
+            
+            await status_msg.edit_text(f"Downloading {i}/{len(entries)}: {title}")
+
+            if await download_mufile(url, dl_file_path):
+                # Upload to Telegram
+                await status_msg.edit_text(f"Uploading {i}/{len(entries)}: {title}")
+                
+                topic_id = None
+                if file_message.reply_to_message and file_message.reply_to_message.forum_topic_created:
+                    topic_id = file_message.reply_to_message.message_thread_id
+
+                if await upload_media_telethondl(message.chat.id, message.chat.id, dl_file_path, title, topic_id):
+                    success_count += 1
+                else:
+                    failed_entries.append(f"{title} - {url}")
+            
+                if os.path.exists(dl_file_path):
+                    os.remove(dl_file_path)
+                
+            
+        except Exception as e:
+            print(f"Error processing entry {i}: {e}")
+            failed_entries.append(f"{entry.get('title', f'Entry {i}')} - {entry.get('url', '')}")
+    
+    # Clean up
+    os.remove(file_path)
+    
+    # Send final status
+    result_text = (
+        f"Processed {len(entries)} links.\n"
+        f"✅ Success: {success_count}\n"
+        f"❌ Failed: {len(failed_entries)}"
+    )
+    
+    if failed_entries:
+        result_text += "\n\nFailed entries:\n" + "\n".join(failed_entries[:5])
+        if len(failed_entries) > 5:
+            result_text += f"\n...and {len(failed_entries)-5} more"
+    
+    await status_msg.edit_text(result_text)
+
+
+
+
+
 
 @app.on_message(filters.command("batchhtml") & filters.private)
 async def batch_download_command(_, message: Message):
