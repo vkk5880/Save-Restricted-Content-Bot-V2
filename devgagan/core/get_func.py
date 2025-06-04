@@ -341,6 +341,110 @@ async def upload_media_telethon(sender, target_chat_id, file, caption, topic_id)
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+async def upload_media_telethondl(sender, target_chat_id, file, caption, topic_id):
+    try:
+        print("UPLOADING MEDIA TELETHON")
+        # Get file metadata
+        metadata = video_metadata(file)
+        width, height, duration = metadata['width'], metadata['height'], metadata['duration']
+        thumb_path = await screenshot(file, duration, sender)
+
+        video_formats = {'mp4', 'mkv', 'avi', 'mov'}
+        document_formats = {'pdf', 'docx', 'txt', 'epub'}
+        image_formats = {'jpg', 'png', 'jpeg'}
+
+        # Delete the edit message since we'll use our own progress
+        #await edit.delete()
+        progress_message = await gf.send_message(sender, "**__Uploading...__**")
+
+        # Upload with floodwait handling
+        try:
+            uploaded = await fast_uploads(
+                gf, file,
+                reply=progress_message,
+                name=None,
+                progress_bar_function=lambda done, total: progress_callback(done, total, sender)
+            )
+        except FloodWaitError as fw:
+            await progress_message.edit(f"⏳ FloodWait: Sleeping for {fw.seconds} seconds...")
+            await asyncio.sleep(fw.seconds)
+            # Retry after floodwait
+            uploaded = await fast_upload(
+                gf, file,
+                reply=progress_message,
+                name=None,
+                progress_bar_function=lambda done, total: progress_callback(done, total, sender)
+            )
+
+        await progress_message.delete()
+
+        # Prepare attributes based on file type
+        attributes = []
+        if file.split('.')[-1].lower() in video_formats:
+            attributes.append(DocumentAttributeVideo(
+                duration=duration,
+                w=width,
+                h=height,
+                supports_streaming=True
+            ))
+
+        # Send to target chat
+        await gf.send_file(
+            target_chat_id,
+            uploaded,
+            caption=caption,
+            attributes=attributes,
+            reply_to=topic_id,
+            thumb=thumb_path
+        )
+
+        # Send to log group
+        await gf.send_file(
+            LOG_GROUP,
+            uploaded,
+            caption=caption,
+            attributes=attributes,
+            thumb=thumb_path
+        )
+        return True
+
+    except Exception as e:
+        await gf.send_message(LOG_GROUP, f"**Upload Failed:** {str(e)}")
+        print(f"Error during media upload: {e}")
+        raise  # Re-raise the exception for higher level handling
+        return False
+
+    finally:
+        # Cleanup
+        if thumb_path and os.path.exists(thumb_path):
+            os.remove(thumb_path)
+        if 'progress_message' in locals():
+            try:
+                await progress_message.delete()
+            except:
+                pass
+        gc.collect()
+
+
+
+
+
+
+
+
+
+
 async def get_media_filename_telethon(msg):
     """Get filename from media message"""
     if isinstance(msg.media, types.MessageMediaDocument):
