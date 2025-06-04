@@ -58,7 +58,8 @@ def extract_links_from_file(file_path):
     # Pattern to match both formats:
     # Title:https://url
     # or just https://url
-    pattern = r'(?:([^:\n]+):)?(https?://[^\s]+)'
+    #pattern = r'(?:([^:\n]+):)?(https?://[^\s]+)'
+    pattern = r'(?:(.+?):)?(https?://[^\s]+)'
     matches = re.findall(pattern, content)
     
     entries = []
