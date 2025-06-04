@@ -117,7 +117,6 @@ def format_entry(entry, index, common_title=None):
         f"┣⪼{'𝑽𝒊𝒅𝒆𝒐' if file_type == 'Video' else '𝑫𝒐𝒄𝒖𝒎𝒆𝒏𝒕'} 𝑻𝒊𝒕𝒍𝒆 : {title}\n\n"
         f"✨𝑩𝒂𝒕𝒄𝒉 𝑵𝒂𝒎𝒆: {common_title or 'No Batch'}\n"
         f"📅 𝑫𝒂𝒕𝒆: {date}\n"
-        #f"🔗 𝑼𝑹𝑳: {url}\n"
         f"╰━━━━━━━━━━━━━ ❀° ━━━╯\n"
     )
 
