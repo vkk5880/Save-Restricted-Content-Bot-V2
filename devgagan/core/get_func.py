@@ -190,6 +190,7 @@ def human_readable_size(size: int) -> str:
 
 async def get_telegram_direct_url(message: Message, file: Message) -> str:
     """Get direct download URL for Telegram file"""
+    logger.info("Handles message get_telegram_direct_url, start")
     if file.document or file.video or file.audio:
         file_id = file.document.file_id if file.document else file.video.file_id if file.video else file.audio.file_id
     else:
@@ -261,11 +262,13 @@ async def get_msg_direct(userbot, sender, edit_id, msg_link, i, message):
 
         file_name = await get_media_filename(msg)
         edit = await app.edit_message_text(sender, edit_id, "**Downloading...**")
+        logger.info("Handles message get_telegram_direct_url, Downloading")
 
 
         direct_url = await get_telegram_direct_url(msg, msg)
         file = None
         if direct_url:
+            logger.info("Handles message direct_url, Downloading")
             try:
                 file = await download_with_progress(direct_url,
                                                          progress_callback=lambda c, t: progress_callback(c, t, edit)
