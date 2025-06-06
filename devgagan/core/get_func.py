@@ -188,24 +188,26 @@ def human_readable_size(size: int) -> str:
 
 
 
-async def get_telegram_direct_url(message: Message, file: Message) -> str:
+async def get_telegram_direct_url(client: Client, file: Message) -> str:
     """Get direct download URL for Telegram file"""
     logger.info("Handles message get_telegram_direct_url, start")
     if file.document or file.video or file.audio:
         file_id = file.document.file_id if file.document else file.video.file_id if file.video else file.audio.file_id
+        logger.info("Handles message processing using Pyrogram client, file_id")
     else:
+        logger.warning("The provided message does not contain a supported file type (document, video, or audio).")
         return None
     
     # Get file info from Telegram servers
-    file_info = await message._client.get_file(file_id)
-    
+    file_info = await client.get_file(file_id)
+    logger.info("Handles message processing using Pyrogram client, file_info")
     # Construct direct download URL
     if hasattr(file_info, 'file_path'):
         # For newer files (CDN)
-        return f"https://api.telegram.org/file/bot{message._client.token}/{file_info.file_path}"
+        return f"https://api.telegram.org/file/bot{client.token}/{file_info.file_path}"
     else:
         # For older files (legacy)
-        return f"https://api.telegram.org/file/bot{message._client.token}/{file_id}"
+        return f"https://api.telegram.org/file/bot{client.token}/{file_id}"
 
 
 async def get_msg_direct(userbot, sender, edit_id, msg_link, i, message):
@@ -265,7 +267,7 @@ async def get_msg_direct(userbot, sender, edit_id, msg_link, i, message):
         logger.info("Handles message get_telegram_direct_url, Downloading")
 
 
-        direct_url = await get_telegram_direct_url(msg, msg)
+        direct_url = await get_telegram_direct_url(userbot, msg)
         file = None
         if direct_url:
             logger.info("Handles message direct_url, Downloading")
