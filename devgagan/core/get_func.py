@@ -199,8 +199,14 @@ async def get_telegram_direct_url(client: Client, file: Message) -> str:
         logger.warning("The provided message does not contain a supported file type (document, video, or audio).")
         return None
     
-    # Get file info from Telegram servers
-    file_info = await client.get_file(file_id)
+
+    try:
+        file_info = await client.get_file(file_id)
+        # ... continue processing
+    except FileIdInvalid:
+        logger.error("The file_id '%s' is invalid. Skipping.", file_id)
+    except Exception as e:
+        logger.error("An unexpected error occurred for file_id '%s': %s", file_id, e)
     logger.info("Handles message processing using Pyrogram client, file_info")
     # Construct direct download URL
     if hasattr(file_info, 'file_path'):
