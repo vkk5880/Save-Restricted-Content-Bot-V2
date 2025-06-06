@@ -21,7 +21,7 @@ import pymongo
 from pyrogram import filters, Client
 from devgagan import app
 from config import API_ID, API_HASH, FREEMIUM_LIMIT, PREMIUM_LIMIT, OWNER_ID
-from devgagan.core.get_func import get_msg
+from devgagan.core.get_func import get_msg, get_msg_direct
 from devgagan.core.get_func import get_msg_telethon
 from devgagan.core.func import *
 from devgagan.core.mongo import db
@@ -102,6 +102,13 @@ async def fetch_upload_method(message, user_id):
     #print(f"fetch_upload_method ... {user_data.get('upload_method', 'Pyrogram')}")
     return user_data.get("upload_method", "Pyrogram") if user_data else "Pyrogram"
 
+async def process_and_upload_direct(userbot, user_id, msg_id, link, retry_count, message):
+    print("process_and_upload_direct method.")
+    try:
+        await get_msg_direct(userbot, user_id, msg_id, link, retry_count, message)
+        await asyncio.sleep(4)
+    finally:
+        pass
 
 
 async def process_and_upload_link(userbot, user_id, msg_id, link, retry_count, message):
@@ -586,6 +593,158 @@ async def batch_link(_, message):
             await telethon_userbot.disconnect()
         
 
+
+
+
+@app.on_message(filters.command("batchdr") & filters.private)
+async def batchdr_link(_, message):
+    join = await subscribe(_, message)
+    if join == 1:
+        return
+    user_id = message.chat.id
+    
+    # Check if a batch process is already running
+    if users_loop.get(user_id, False):
+        await app.send_message(
+            message.chat.id,
+            "You already have a batch process running. Please wait for it to complete."
+        )
+        return
+
+    freecheck = await chk_user(message, user_id)
+    if freecheck == 1 and FREEMIUM_LIMIT == 0 and user_id not in OWNER_ID and not await is_user_verified(user_id):
+        await message.reply("Freemium service is currently not available. Upgrade to premium for access.")
+        return
+
+
+    sessions = await db.get_sessions(user_id)
+    if not sessions or not sessions.get("userbot_token"):
+        if user_id not in OWNER_ID:
+            logger.warning(f"No userbot_token found for user {user_id}")
+            msg = await message.reply(
+                "⚠️ You need to set up your bot first. Please use /setbot.\n\n"
+                "💡 Tip: Set preferred file formats in /settings for automatic conversion."
+            )
+            return None
+    
+    max_batch_size = FREEMIUM_LIMIT if freecheck == 1 else PREMIUM_LIMIT
+
+    # Start link input
+    for attempt in range(3):
+        start = await app.ask(message.chat.id, "Please send the start link.\n\n> Maximum tries 3")
+        start_id = start.text.strip()
+        s = start_id.split("/")[-1]
+        if s.isdigit():
+            cs = int(s)
+            break
+        await app.send_message(message.chat.id, "Invalid link. Please send again ...")
+    else:
+        await app.send_message(message.chat.id, "Maximum attempts exceeded. Try later.")
+        return
+
+    # Number of messages input
+    for attempt in range(3):
+        num_messages = await app.ask(message.chat.id, f"How many messages do you want to process?\n> Max limit {max_batch_size}")
+        try:
+            cl = int(num_messages.text.strip())
+            if 1 <= cl <= max_batch_size:
+                break
+            raise ValueError()
+        except ValueError:
+            await app.send_message(
+                message.chat.id, 
+                f"Invalid number. Please enter a number between 1 and {max_batch_size}."
+            )
+    else:
+        await app.send_message(message.chat.id, "Maximum attempts exceeded. Try later.")
+        return
+
+    # Validate and interval check
+    can_proceed, response_message = await check_interval(user_id, freecheck)
+    if not can_proceed:
+        await message.reply(response_message)
+        return
+        
+    join_button = InlineKeyboardButton("Join Channel", url=CHANNEL_LINK)
+    keyboard = InlineKeyboardMarkup([[join_button]])
+    pin_msg = await app.send_message(
+        user_id,
+        f"Batch process started ⚡\nProcessing: 0/{cl}\n\n****",
+        reply_markup=keyboard
+    )
+    await pin_msg.pin(both_sides=True)
+
+    users_loop[user_id] = True
+    telethon_userbot = None
+    userbot = None
+    
+    try:
+        upload_methods = await fetch_upload_method(message, user_id)
+        print(f"upload_method ... {upload_methods}")
+        
+        # Initialize the appropriate client
+        userbot = await initialize_userbot(user_id)
+        
+        normal_links_handled = False
+        
+        # Process all links
+        for i in range(cs, cs + cl):
+            if not users_loop.get(user_id, False):
+                break
+                
+            url = f"{'/'.join(start_id.split('/')[:-1])}/{i}"
+            link = get_link(url)
+            msg = await app.send_message(message.chat.id, f"Processing...")
+            
+            try:
+                # Handle normal public links
+                if 't.me/' in link and not any(x in link for x in ['t.me/b/', 't.me/c/', 'tg://openmessage']):
+                    await process_and_upload_link(userbot, user_id, msg.id, link, i-cs, message)
+                    normal_links_handled = True
+                
+                # Handle special links
+                elif any(x in link for x in ['t.me/b/', 't.me/c/', 'tg://openmessage']):
+                    if userbot:
+                        await process_and_upload_direct(userbot, user_id, msg.id, link, i-cs, message)
+                    else:
+                        await app.send_message(message.chat.id, "Login in bot first ...")
+                        break
+                
+                await pin_msg.edit_text(
+                    f"Batch process started ⚡\nProcessing: {i - cs + 1}/{cl}\n\n****",
+                    reply_markup=keyboard
+                )
+                
+            except (FloodWaitError, FloodWait) as fw:
+                seconds = fw.seconds if hasattr(fw, 'seconds') else fw.value
+                await msg.edit_text(f'FloodWait: Try again in {seconds} seconds')
+                await asyncio.sleep(seconds)
+                continue
+            except Exception as e:
+                await msg.edit_text(f"Error processing {link}: {str(e)}")
+                continue
+            finally:
+                try:
+                    await msg.delete()
+                except:
+                    pass
+
+        if normal_links_handled:
+            await set_interval(user_id, interval_minutes=300)
+        
+        await pin_msg.edit_text(
+            f"Batch completed successfully for {cl} messages 🎉\n\n****",
+            reply_markup=keyboard
+        )
+        await app.send_message(message.chat.id, "Batch completed successfully! 🎉")
+
+    except Exception as e:
+        await app.send_message(message.chat.id, f"Batch processing failed: {e}")
+    finally:
+        users_loop.pop(user_id, None)
+        if userbot:
+            await userbot.stop()
+        
 
 @app.on_message(filters.command("cancel"))
 async def stop_batch(_, message):
