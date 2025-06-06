@@ -50,6 +50,7 @@ from telethon import TelegramClient, events, Button
 from devgagan import app
 from devgagan import telethon_user_client  as gf
 from telethon.tl.types import MessageMediaDocument
+from pyrogram import filters, Client
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
