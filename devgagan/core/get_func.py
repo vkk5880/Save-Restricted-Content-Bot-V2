@@ -109,6 +109,203 @@ async def initialize_userbot(user_id): # this ensure the single startup .. even 
     return None
 
 
+import time
+from typing import Callable
+import yt_dlp
+
+async def download_with_progress(
+    url: str,
+    output_path: str = "downloads/",
+    progress_callback: Callable = None,
+    update_interval: int = 3
+) -> str:
+    """
+    Download from any URL with progress updates every N seconds
+    Supports:
+    - Direct HTTP downloads
+    - YouTube videos (via yt-dlp)
+    - Streamable media (via FFmpeg)
+    """
+    
+    os.makedirs(output_path, exist_ok=True)
+    last_update = 0
+    downloaded = 0
+    
+    async def update_progress(current: int, total: int):
+        nonlocal last_update, downloaded
+        downloaded = current
+        now = time.time()
+        if now - last_update >= update_interval:
+            if progress_callback:
+                await progress_callback(current, total)
+            last_update = now
+    
+    # YouTube Downloader
+    if "youtube.com" in url or "youtu.be" in url:
+        ydl_opts = {
+            'format': 'best',
+            'outtmpl': os.path.join(output_path, '%(title)s.%(ext)s'),
+            'progress_hooks': [lambda d: asyncio.create_task(
+                update_progress(d['downloaded_bytes'], d['total_bytes'] if d['total_bytes'] else 1)
+            )],
+        }
+        
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            return ydl.prepare_filename(info)
+    
+    # Direct HTTP Download
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            total = int(response.headers.get('content-length', 0))
+            filename = os.path.join(output_path, url.split('/')[-1].split('?')[0])
+            
+            with open(filename, 'wb') as f:
+                async for chunk in response.content.iter_chunked(1024):
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    await update_progress(downloaded, total)
+            
+            return filename
+
+async def progress_callback(current: int, total: int, message: Message):
+    """Example callback for Telegram progress updates"""
+    percent = (current / total) * 100
+    await message.edit_text(
+        f"**Download Progress:**\n"
+        f"`{human_readable_size(current)} / {human_readable_size(total)}`\n"
+        f"**{percent:.1f}%**\n"
+        f"╰ {'▰' * int(percent//10)}{'▱' * (10 - int(percent//10))}"
+    )
+
+def human_readable_size(size: int) -> str:
+    """Convert bytes to human-readable format"""
+    for unit in ['B', 'KB', 'MB', 'GB']:
+        if size < 1024:
+            return f"{size:.2f} {unit}"
+        size /= 1024
+    return f"{size:.2f} TB"
+
+
+
+async def get_telegram_direct_url(message: Message, file: Message) -> str:
+    """Get direct download URL for Telegram file"""
+    if file.document or file.video or file.audio:
+        file_id = file.document.file_id if file.document else file.video.file_id if file.video else file.audio.file_id
+    else:
+        return None
+    
+    # Get file info from Telegram servers
+    file_info = await message._client.get_file(file_id)
+    
+    # Construct direct download URL
+    if hasattr(file_info, 'file_path'):
+        # For newer files (CDN)
+        return f"https://api.telegram.org/file/bot{message._client.token}/{file_info.file_path}"
+    else:
+        # For older files (legacy)
+        return f"https://api.telegram.org/file/bot{message._client.token}/{file_id}"
+
+
+async def get_msg_direct(userbot, sender, edit_id, msg_link, i, message):
+    try:
+        logger.info("Handles message processing using Pyrogram client, get_msg_direct")
+        # Sanitize the message link
+        msg_link = msg_link.split("?single")[0]
+        chat, msg_id = None, None
+        saved_channel_ids = load_saved_channel_ids()
+        size_limit = 2 * 1024 * 1024 * 1024  # 1.99 GB size limit
+        file = ''
+        edit = ''
+        # Extract chat and message ID for valid Telegram links
+        if 't.me/c/' in msg_link or 't.me/b/' in msg_link:
+            parts = msg_link.split("/")
+            if 't.me/b/' in msg_link:
+                chat = parts[-2]
+                msg_id = int(parts[-1]) + i # fixed bot problem
+            else:
+                chat = int('-100' + parts[parts.index('c') + 1])
+                msg_id = int(parts[-1]) + i
+
+            if chat in saved_channel_ids:
+                await app.edit_message_text(
+                    message.chat.id, edit_id,
+                    "Sorry! This channel is protected by **Admin**."
+                )
+                return
+
+        elif '/s/' in msg_link: # fixed story typo
+            await edit.delete(2)
+            return
+
+        else:
+            await edit.delete(2)
+            return
+
+        # Fetch the target message
+        msg = await userbot.get_messages(chat, msg_id)
+        if not msg or msg.service or msg.empty or msg.sticker or msg.text or msg.media == MessageMediaType.WEB_PAGE_PREVIEW:
+            return
+
+        target_chat_id = user_chat_ids.get(message.chat.id, message.chat.id)
+        topic_id = None
+        if '/' in str(target_chat_id):
+            target_chat_id, topic_id = map(int, target_chat_id.split('/', 1))
+
+        # Handle file media (photo, document, video)
+        file_size = get_message_file_size(msg)
+
+        if file_size and file_size > size_limit and pro is None:
+            await app.edit_message_text(sender, edit_id, "**❌ 4GB Uploader not found**")
+            return
+
+        file_name = await get_media_filename(msg)
+        edit = await app.edit_message_text(sender, edit_id, "**Downloading...**")
+
+
+        direct_url = await get_telegram_direct_url(msg, msg)
+        file = None
+        if direct_url:
+            try:
+                file = await download_with_progress(direct_url,
+                                                         progress_callback=lambda c, t: progress_callback(c, t, edit)
+                                                        )
+                await edit.edit(f"✅ Download complete!\nSaved to: `{file_path}`")
+            except Exception as e:
+                await edit.edit(f"❌ Download failed:\n`{str(e)}`")
+        else:
+            print("Could not generate a direct URL for this file type.")
+        
+        caption = await get_final_caption(msg, sender)
+
+        # Rename file
+        file = await rename_file(file, sender)
+        
+        # Upload media
+        # await edit.edit("**Checking file...**")
+        if file_size > size_limit:
+            await handle_large_file(file, sender, edit, caption)
+        else:
+            result = await upload_media_telethon(sender, target_chat_id, file, caption, topic_id)
+            if result:
+                await result.copy(LOG_GROUP)
+
+    except (ChannelBanned, ChannelInvalid, ChannelPrivate, ChatIdInvalid, ChatInvalid):
+        await app.edit_message_text(sender, edit_id, "Have you joined the channel?")
+    except Exception as e:
+        # await app.edit_message_text(sender, edit_id, f"Failed to save: `{msg_link}`\n\nError: {str(e)}")
+        #print(f"Error: {e}")
+        pass
+    finally:
+        # Clean up
+        if file and os.path.exists(file):
+            os.remove(file)
+        if edit:
+            await edit.delete(2)
+
+
+
+
 async def get_msg_telethon(telethon_userbot, sender, edit_id, msg_link, i, message):
     """
     Handles message processing using Telethon client.
