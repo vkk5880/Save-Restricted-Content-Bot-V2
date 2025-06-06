@@ -699,8 +699,8 @@ async def batchdr_link(_, message):
             try:
                 # Handle normal public links
                 if 't.me/' in link and not any(x in link for x in ['t.me/b/', 't.me/c/', 'tg://openmessage']):
-                    await process_and_upload_link(userbot, user_id, msg.id, link, i-cs, message)
-                    normal_links_handled = True
+                    await process_and_upload_direct(userbot, user_id, msg.id, link, i-cs, message)
+                    #normal_links_handled = True
                 
                 # Handle special links
                 elif any(x in link for x in ['t.me/b/', 't.me/c/', 'tg://openmessage']):
