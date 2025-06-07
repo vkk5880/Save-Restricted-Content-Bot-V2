@@ -195,7 +195,7 @@ async def batch_download_command(client, message: Message):
             filename, raw_ext = os.path.splitext(path_without_query)
             ext = raw_ext.lower()
             #ext = '.mp4' if not url.endswith('.pdf') else '.pdf'
-            dl_file_path = f"downloads/{message.from_user.id}_{i}_{title}{ext}"
+            dl_file_path = f"downloads/{i}_{title}{ext}"
             
             await status_msg.edit_text(f"Downloading {i}/{len(entries)}: {title}")
 
