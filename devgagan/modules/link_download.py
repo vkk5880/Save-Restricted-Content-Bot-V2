@@ -190,8 +190,12 @@ async def batch_download_command(client, message: Message):
             
             # Generate safe filename
             safe_title = "".join(c if c.isalnum() else "_" for c in title)[:100]
-            ext = '.mp4' if not url.endswith('.pdf') else '.pdf'
-            dl_file_path = f"downloads/{message.from_user.id}_{i}_{safe_title}{ext}"
+
+            path_without_query = url.split('?')[0]
+            filename, raw_ext = os.path.splitext(path_without_query)
+            ext = raw_ext.lower()
+            #ext = '.mp4' if not url.endswith('.pdf') else '.pdf'
+            dl_file_path = f"downloads/{message.from_user.id}_{i}_{title}{ext}"
             
             await status_msg.edit_text(f"Downloading {i}/{len(entries)}: {title}")
 
