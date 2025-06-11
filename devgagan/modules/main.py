@@ -613,15 +613,15 @@ TEXTS = """📊 **Forwarding Progress**
 @app.on_message(filters.command("batchfrw") & filters.private)
 async def start_forwardings(_, messages):
     try:
+        user_id = message.chat.id
+        message = await app.send_message(user_id,"Processing.")
+        client = await initialize_userbot(user_id)
+    except Exception as e:
+        logger.error(f"Forwarding error: {str(e)}")
+    try:
         start_time = time.time()
         limit = 42463  # Total messages to process
-        user_id = message.chat.id
-        message = await app.send_message(
-            user_id,
-            "Processing."
-        )
-
-        client = await initialize_userbot(user_id)
+        
 
         stats = {
             'forwarded': 0,
@@ -633,7 +633,7 @@ async def start_forwardings(_, messages):
 
         from_chat_id = -1002537877576
         to_chat_id = -1002751356541
-        current_msg_id = 10000
+        current_msg_id = 2000
 
         while stats['fetched'] < limit:
             remaining = limit - stats['fetched']
@@ -682,8 +682,8 @@ async def process_batchs(client, batch, chat_id, to_id, stats, status_msg):
             message_ids=batch,
         )
         stats['forwarded'] += len(batch)
-        await update_progress(status_msg, stats, None, "Waiting 3s")
-        await asyncio.sleep(3)
+        await update_progress(status_msg, stats, None, "Waiting 15s")
+        await asyncio.sleep(20)
 
     except FloodWait as e:
         await update_progress(status_msg, stats, None, f"FloodWait Waiting {e.value}s")
@@ -730,16 +730,15 @@ TEXT = """📊 **Forwarding Progress**
 @app.on_message(filters.command("batchfr") & filters.private)
 async def start_forwarding(_, messages):
     try:
-        start_time = time.time()
-        limit = 5000  # Total messages to process
-        user_id = messages.chat.id
-        
-        message = await app.send_message(
-            user_id,
-            "Processing."
-        )
-
+        user_id = message.chat.id
+        message = await app.send_message(user_id,"Processing.")
         client = await initialize_userbot(user_id)
+    except Exception as e:
+        logger.error(f"Forwarding error: {str(e)}")
+    
+    try:
+        start_time = time.time()
+        limit = 2000  # Total messages to process
 
         stats = {
             'forwarded': 0,
@@ -750,7 +749,7 @@ async def start_forwarding(_, messages):
         }
 
         batch = []
-        async for msg in iter_messages(client, -1002537877576, limit, 200):
+        async for msg in iter_messages(client, -1002537877576, limit, 5):
             
 
             stats['fetched'] += 1
@@ -788,8 +787,8 @@ async def process_batch(client, batch, chat_id, to_id, stats, status_msg):
             message_ids=batch,
         )
         stats['forwarded'] += len(batch)
-        await update_progress(status_msg, stats, None, "Waiting 3s")
-        await asyncio.sleep(3)
+        await update_progress(status_msg, stats, None, "Waiting 20s")
+        await asyncio.sleep(20)
 
     except FloodWait as e:
         await update_progress(status_msg, stats, None, f"FloodWait Waiting {e.value}s")
