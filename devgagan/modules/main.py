@@ -612,12 +612,31 @@ TEXTS = """📊 **Forwarding Progress**
 
 @app.on_message(filters.command("batchfrw") & filters.private)
 async def start_forwardings(_, messages):
-    try:
+    user_id = messages.chat.id
+    max_retries = 3  # Avoid infinite loops
+
+    for attempt in range(max_retries):
+        try:
+            message = await app.send_message(user_id, "🔄 Processing...")
+            client = await initialize_userbot(user_id)
+            break  # Success!
+        except FloodWait as e:
+            logger.warning(f"FloodWait triggered: sleeping for {e.value} seconds")
+            await app.send_message(f"⏳ FloodWait: Waiting {e.value}s...")
+            await asyncio.sleep(e.value)
+        except Exception as e:
+            logger.error(f"Initialization error: {str(e)}")
+            await app.send_message(user_id, f"❌ Error: {str(e)}")
+            return
+    else:
+        await app.send_message(user_id, "❌ Too many retries. Try again later.")
+        return
+    """try:
         user_id = message.chat.id
         message = await app.send_message(user_id,"Processing.")
         client = await initialize_userbot(user_id)
     except Exception as e:
-        logger.error(f"Forwarding error: {str(e)}")
+        logger.error(f"Forwarding error: {str(e)}")"""
     try:
         start_time = time.time()
         limit = 42463  # Total messages to process
@@ -729,14 +748,29 @@ TEXT = """📊 **Forwarding Progress**
 
 @app.on_message(filters.command("batchfr") & filters.private)
 async def start_forwarding(_, messages):
-    try:
-        user_id = message.chat.id
-        message = await app.send_message(user_id,"Processing.")
-        client = await initialize_userbot(user_id)
-    except Exception as e:
-        logger.error(f"Forwarding error: {str(e)}")
+    user_id = message.chat.id
+    max_retries = 3  # Avoid infinite loops
+
+    for attempt in range(max_retries):
+        try:
+            message = await app.send_message(user_id, "🔄 Processing...")
+            client = await initialize_userbot(user_id)
+            break  # Success!
+        except FloodWait as e:
+            logger.warning(f"FloodWait triggered: sleeping for {e.value} seconds")
+            await app.send_message(f"⏳ FloodWait: Waiting {e.value}s...")
+            await asyncio.sleep(e.value)
+        except Exception as e:
+            logger.error(f"Initialization error: {str(e)}")
+            await app.send_message(user_id, f"❌ Error: {str(e)}")
+            return
+    else:
+        await app.send_message(user_id, "❌ Too many retries. Try again later.")
+        return
+
     
     try:
+        
         start_time = time.time()
         limit = 2000  # Total messages to process
 
