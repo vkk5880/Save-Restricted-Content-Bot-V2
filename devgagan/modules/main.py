@@ -604,48 +604,65 @@ async def batch_link(_, message):
 
 
 
+
+
+# Globals (should be defined or imported)
+
+TEXT = """📊 **Forwarding Progress**
+
+🧾 **Fetched**: `{fetched}/{total}`
+📤 **Forwarded**: `{forwarded}`
+🗑 **Deleted**: `{deleted}`
+
+⏱ **Status**: {status}
+🔄 **Progress**: {percentage}% 
+{progress_bar}
+⏳ **ETA**: {eta}
+"""
+
 @app.on_message(filters.command("batchfr") & filters.private)
 async def start_forwarding(_, message):
-    start_time = time.time()
-    limit = 42463
-    user_id = message.chat.id
-    client = await initialize_userbot(user_id)
-   #https://t.me/c/2537877576/42463
+    try:
+        start_time = time.time()
+        limit = 42463  # Total messages to process
+        user_id = message.chat.id
         
+
+        client = await initialize_userbot(user_id)
+
         stats = {
             'forwarded': 0,
             'deleted': 0,
             'fetched': 0,
-            'total': 42463,
+            'total': limit,
             'start_time': start_time
         }
 
         batch = []
-        async for msg in iter_messages(client, -1002537877576, 42463, 3000):
+        async for msg in iter_messages(client, -1002537877576, limit, 3000):
             
+
             stats['fetched'] += 1
-            
+
             if msg.empty or msg.service:
                 stats['deleted'] += 1
                 continue
 
-            
             batch.append(msg.id)
+
             if len(batch) >= 100 or (limit - stats['fetched']) <= 5:
-                await process_batch(client, batch, -1002537877576, -1002618453278,  stats, message)
+                await process_batch(client, batch, -1002537877576, -1002618453278, stats, message)
                 batch = []
-           
-            # Update progress periodically
+
             if stats['fetched'] % 20 == 0 or stats['fetched'] == limit:
                 await update_progress(message, stats, limit, 'Forwarding')
 
-        # Process any remaining messages in batch
-        if batch
+        if batch:
             await process_batch(client, batch, -1002537877576, -1002618453278, stats, message)
 
         status = 'Completed' if users_loop.get(user_id, False) else 'Cancelled'
         await update_progress(message, stats, limit, status)
-        
+
     except Exception as e:
         logger.error(f"Forwarding error: {str(e)}")
         await message.edit_text(f"❌ Error: {str(e)}")
@@ -654,66 +671,29 @@ async def start_forwarding(_, message):
 
 async def process_batch(client, batch, chat_id, to_id, stats, status_msg):
     try:
-        if True:
-            await client.forward_messages(
-                chat_id=to_id,
-                from_chat_id=chat_id,
-                message_ids=batch,
-                protect_content=configs.get('protect', False)
-            )
-        else:
-            for msg_id in batch:
-                msg = await client.get_messages(chat_id, msg_id)
-                await copy_message(client, msg, to_id, stats, status_msg)
-        
+        await client.forward_messages(
+            chat_id=to_id,
+            from_chat_id=chat_id,
+            message_ids=batch,
+            protect_content=configs.get('protect', False)
+        )
         stats['forwarded'] += len(batch)
         await update_progress(status_msg, stats, None, "Waiting 3s")
         await asyncio.sleep(3)
+
     except FloodWait as e:
         await update_progress(status_msg, stats, None, f"FloodWait Waiting {e.value}s")
         await asyncio.sleep(e.value)
-        await process_batch(client, batch, chat_id, to_id,  stats, status_msg)
+        await process_batch(client, batch, chat_id, to_id, stats, status_msg)
     except Exception as e:
         logger.error(f"Batch error: {str(e)}")
 
-async def copy_message(client, message, to_id, stats, status_msg):
-    try:
-        caption = custom_caption(message, configs.get('caption', ''))
-        if message.media and caption:
-            await client.send_cached_media(
-                chat_id=to_id,
-                file_id=media(message),
-                caption=caption,
-                reply_markup=configs.get('button'),
-                protect_content=configs.get('protect', False)
-        else:
-            await client.copy_message(
-                chat_id=to_id,
-                from_chat_id=message.chat.id,
-                message_id=message.id,
-                caption=caption,
-                reply_markup=configs.get('button'),
-                protect_content=configs.get('protect', False))
-        
-        stats['forwarded'] += 1
-        await asyncio.sleep(1)
-    except FloodWait as e:
-        await update_progress(status_msg, stats, None, f"FloodWait Waiting {e.value}s")
-        await asyncio.sleep(e.value)
-        await copy_message(client, message, to_id, stats, status_msg)
-    except Exception as e:
-        logger.error(f"Copy error: {str(e)}")
-
 async def update_progress(message, stats, total, status):
     try:
-        if not total:
-            total = stats['total']
-        percentage = math.floor((stats['fetched'] / total) * 100) if total else 0
-        progress_bar = "".join(
-            "▓" if i < percentage//10 else "░"
-            for i in range(10))
-        
-        # Calculate ETA
+        total = total or stats['total']
+        percentage = math.floor((stats['fetched'] / total) * 100)
+        progress_bar = "".join("▓" if i < percentage // 10 else "░" for i in range(10))
+
         elapsed = time.time() - stats['start_time']
         if stats['forwarded'] > 0 and elapsed > 0:
             remaining = (total - stats['forwarded']) * (elapsed / stats['forwarded'])
@@ -741,126 +721,61 @@ async def update_progress(message, stats, total, status):
                 [InlineKeyboardButton('💬 Support', url='https://t.me/vijaychoudhary88')]
             ])
 
-        await message.edit_text(
-            text,
-            reply_markup=InlineKeyboardMarkup(buttons)
-        )
+        await message.edit_text(text, reply_markup=InlineKeyboardMarkup(buttons))
     except Exception as e:
         logger.error(f"Progress update error: {str(e)}")
 
 async def cleanup(client, user_id):
     try:
-        if user_id in active_tasks:
-            active_tasks[user_id].cancel()
-            del active_tasks[user_id]
-        
-        if user_id in users_loop:
-            del users_loop[user_id]
-            
         if client:
             await client.stop()
-            
         await db.rmve_frwd(user_id)
     except Exception as e:
         logger.error(f"Cleanup error: {str(e)}")
 
-def custom_caption(msg, template):
-    if not msg or not msg.media:
-        return None
-        
-    media_obj = getattr(msg, msg.media.value, None)
-    if not media_obj:
-        return None
-        
-    file_name = getattr(media_obj, 'file_name', '')
-    file_size = getattr(media_obj, 'file_size', 0)
-    original_caption = getattr(msg, 'caption', '').html if getattr(msg, 'caption', None) else ''
-    
-    if template:
-        return template.format(
-            filename=file_name,
-            size=get_size(file_size),
-            caption=original_caption
-        )
-    return original_caption
-
-def media(msg):
-    if not msg or not msg.media:
-        return None
-    media_obj = getattr(msg, msg.media.value, None)
-    return getattr(media_obj, 'file_id', None) if media_obj else None
-
-def get_size(size):
-    units = ["B", "KB", "MB", "GB", "TB"]
-    size = float(size or 0)
-    i = 0
-    while size >= 1024 and i < len(units)-1:
-        i += 1
-        size /= 1024
-    return f"{size:.2f} {units[i]}"
-
-def TimeFormatter(milliseconds: int) -> str:
-    seconds, milliseconds = divmod(milliseconds, 1000)
-    minutes, seconds = divmod(seconds, 60)
-    hours, minutes = divmod(minutes, 60)
-    days, hours = divmod(hours, 24)
-    
-    parts = []
-    if days: parts.append(f"{days}d")
-    if hours: parts.append(f"{hours}h")
-    if minutes: parts.append(f"{minutes}m")
-    if seconds: parts.append(f"{seconds}s")
-    
-    return " ".join(parts) if parts else "0s"
-
 async def iter_messages(client, chat_id, limit, offset=0):
     current = offset or 1
     fetched = 0
-    
     while fetched < limit:
         batch_size = min(200, limit - fetched)
         try:
-            messages = await client.get_messages(
-                chat_id,
-                message_ids=range(current, current + batch_size)
-            )
-            
+            messages = await client.get_messages(chat_id, message_ids=range(current, current + batch_size))
             for msg in messages:
-                if msg:  # and not msg.empty:
+                if msg:
                     yield msg
                     fetched += 1
                     if fetched >= limit:
                         break
-            
             current += batch_size
         except Exception as e:
             logger.error(f"Message fetch error: {str(e)}")
             break
 
-@Client.on_callback_query(filters.regex(r'^terminate_frwd$'))
-async def handle_terminate(c: Client, cb: CallbackQuery):
-    user_id = cb.from_user.id
-    if user_id in users_loop:
-        users_loop[user_id] = False
-        await cb.answer("⏹ Forwarding cancelled")
-    else:
-        await cb.answer("❌ No active task to cancel")
+
 
 @Client.on_callback_query(filters.regex(r'^fwrdstatus'))
 async def handle_status(c: Client, cb: CallbackQuery):
     _, status, _, percentage, _ = cb.data.split('#')
-    await cb.answer(
-        f"Status: {status}\nProgress: {percentage}%",
-        show_alert=True
-    )
+    await cb.answer(f"Status: {status}\nProgress: {percentage}%", show_alert=True)
 
 @Client.on_callback_query(filters.regex(r'^close_btn$'))
 async def handle_close(c: Client, cb: CallbackQuery):
     await cb.answer()
     await cb.message.delete()
 
+def TimeFormatter(milliseconds: int) -> str:
+    seconds, milliseconds = divmod(milliseconds, 1000)
+    minutes, seconds = divmod(seconds, 60)
+    hours, minutes = divmod(minutes, 60)
+    days, hours = divmod(hours, 24)
 
+    parts = []
+    if days: parts.append(f"{days}d")
+    if hours: parts.append(f"{hours}h")
+    if minutes: parts.append(f"{minutes}m")
+    if seconds: parts.append(f"{seconds}s")
 
+    return " ".join(parts) if parts else "0s"
 
 
 
