@@ -621,7 +621,7 @@ async def start_forwarding(_, message):
         }
 
         batch = []
-        async for msg in iter_messages(client, -1002537877576, 42463, 1):
+        async for msg in iter_messages(client, -1002537877576, 42463, 3000):
             
             stats['fetched'] += 1
             
