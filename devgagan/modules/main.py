@@ -632,7 +632,7 @@ async def start_forwardings(_, messages):
         }
 
         from_chat_id = -1002537877576
-        to_chat_id = -1002618453278
+        to_chat_id = -1002751356541
         current_msg_id = 10000
 
         while stats['fetched'] < limit:
@@ -731,7 +731,7 @@ TEXT = """📊 **Forwarding Progress**
 async def start_forwarding(_, messages):
     try:
         start_time = time.time()
-        limit = 42463  # Total messages to process
+        limit = 5000  # Total messages to process
         user_id = messages.chat.id
         
         message = await app.send_message(
@@ -750,7 +750,7 @@ async def start_forwarding(_, messages):
         }
 
         batch = []
-        async for msg in iter_messages(client, -1002537877576, limit, 1):
+        async for msg in iter_messages(client, -1002537877576, limit, 200):
             
 
             stats['fetched'] += 1
