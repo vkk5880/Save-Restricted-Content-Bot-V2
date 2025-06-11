@@ -598,6 +598,110 @@ async def batch_link(_, message):
 
 
 
+TEXTS = """📊 **Forwarding Progress**
+
+🧾 **Fetched**: `{fetched}/{total}`
+📤 **Forwarded**: `{forwarded}`
+🗑 **Deleted**: `{deleted}`
+
+⏱ **Status**: {status}
+🔄 **Progress**: {percentage}% 
+{progress_bar}
+⏳ **ETA**: {eta}
+"""
+
+@app.on_message(filters.command("batchfrw") & filters.private)
+async def start_forwardings(_, message):
+    try:
+        start_time = time.time()
+        limit = 42463  # Total messages to process
+        user_id = message.chat.id
+
+        client = await initialize_userbot(user_id)
+
+        stats = {
+            'forwarded': 0,
+            'deleted': 0,
+            'fetched': 0,
+            'total': limit,
+            'start_time': start_time
+        }
+
+        from_chat_id = -1002537877576
+        to_chat_id = -1002618453278
+        current_msg_id = 10000
+
+        while stats['fetched'] < limit:
+            remaining = limit - stats['fetched']
+            batch_size = min(100, remaining)
+            batch_ids = list(range(current_msg_id, current_msg_id + batch_size))
+
+            try:
+                messages = await client.get_messages(from_chat_id, message_ids=batch_ids)
+            except Exception as e:
+                logger.error(f"Message fetch error: {str(e)}")
+                break
+
+            batch_to_forward = []
+
+            for msg in messages:
+                if not msg:
+                    continue
+                stats['fetched'] += 1
+                if msg.empty or msg.service:
+                    stats['deleted'] += 1
+                    continue
+                batch_to_forward.append(msg.id)
+
+            if batch_to_forward:
+                await process_batchs(client, batch_to_forward, from_chat_id, to_chat_id, stats, message)
+
+            current_msg_id += batch_size
+
+            if stats['fetched'] % 20 == 0 or stats['fetched'] >= limit:
+                await update_progress(message, stats, limit, 'Forwarding')
+
+        status = 'Completed' if users_loop.get(user_id, False) else 'Cancelled'
+        await update_progress(message, stats, limit, status)
+
+    except Exception as e:
+        logger.error(f"Forwarding error: {str(e)}")
+        await message.edit_text(f"❌ Error: {str(e)}")
+    finally:
+        await cleanup(client, user_id)
+
+async def process_batchs(client, batch, chat_id, to_id, stats, status_msg):
+    try:
+        await client.forward_messages(
+            chat_id=to_id,
+            from_chat_id=chat_id,
+            message_ids=batch,
+            protect_content=configs.get('protect', False)
+        )
+        stats['forwarded'] += len(batch)
+        await update_progress(status_msg, stats, None, "Waiting 3s")
+        await asyncio.sleep(3)
+
+    except FloodWait as e:
+        await update_progress(status_msg, stats, None, f"FloodWait Waiting {e.value}s")
+        await asyncio.sleep(e.value)
+        await process_batch(client, batch, chat_id, to_id, stats, status_msg)
+    except Exception as e:
+        logger.error(f"Batch error: {str(e)}")
+
+# update_progress, cleanup, TimeFormatter, and callback handlers remain unchanged
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -639,7 +743,7 @@ async def start_forwarding(_, message):
         }
 
         batch = []
-        async for msg in iter_messages(client, -1002537877576, limit, 3000):
+        async for msg in iter_messages(client, -1002537877576, limit, 1):
             
 
             stats['fetched'] += 1
