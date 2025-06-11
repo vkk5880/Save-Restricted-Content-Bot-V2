@@ -45,7 +45,7 @@ from telethon.errors import (
     AccessTokenExpiredError,
     AuthKeyDuplicatedError
 )
-
+from pyrogram.types import CallbackQuery
 
 '''
 from devgagan.modules.connect_user import (
