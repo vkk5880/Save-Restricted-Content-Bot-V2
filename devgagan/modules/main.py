@@ -611,11 +611,15 @@ TEXTS = """📊 **Forwarding Progress**
 """
 
 @app.on_message(filters.command("batchfrw") & filters.private)
-async def start_forwardings(_, message):
+async def start_forwardings(_, messages):
     try:
         start_time = time.time()
         limit = 42463  # Total messages to process
         user_id = message.chat.id
+        message = await app.send_message(
+            user_id,
+            "Processing."
+        )
 
         client = await initialize_userbot(user_id)
 
@@ -676,7 +680,6 @@ async def process_batchs(client, batch, chat_id, to_id, stats, status_msg):
             chat_id=to_id,
             from_chat_id=chat_id,
             message_ids=batch,
-            protect_content=configs.get('protect', False)
         )
         stats['forwarded'] += len(batch)
         await update_progress(status_msg, stats, None, "Waiting 3s")
@@ -725,12 +728,16 @@ TEXT = """📊 **Forwarding Progress**
 """
 
 @app.on_message(filters.command("batchfr") & filters.private)
-async def start_forwarding(_, message):
+async def start_forwarding(_, messages):
     try:
         start_time = time.time()
         limit = 42463  # Total messages to process
-        user_id = message.chat.id
+        user_id = messages.chat.id
         
+        message = await app.send_message(
+            user_id,
+            "Processing."
+        )
 
         client = await initialize_userbot(user_id)
 
@@ -779,7 +786,6 @@ async def process_batch(client, batch, chat_id, to_id, stats, status_msg):
             chat_id=to_id,
             from_chat_id=chat_id,
             message_ids=batch,
-            protect_content=configs.get('protect', False)
         )
         stats['forwarded'] += len(batch)
         await update_progress(status_msg, stats, None, "Waiting 3s")
