@@ -748,7 +748,7 @@ TEXT = """📊 **Forwarding Progress**
 
 @app.on_message(filters.command("batchfr") & filters.private)
 async def start_forwarding(_, messages):
-    user_id = message.chat.id
+    user_id = messages.chat.id
     max_retries = 3  # Avoid infinite loops
 
     for attempt in range(max_retries):
