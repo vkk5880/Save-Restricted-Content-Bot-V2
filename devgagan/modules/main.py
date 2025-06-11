@@ -652,7 +652,7 @@ async def start_forwardings(_, messages):
 
         from_chat_id = -1002537877576
         to_chat_id = -1002751356541
-        current_msg_id = 2000
+        current_msg_id = 3600
 
         while stats['fetched'] < limit:
             remaining = limit - stats['fetched']
@@ -702,7 +702,7 @@ async def process_batchs(client, batch, chat_id, to_id, stats, status_msg):
         )
         stats['forwarded'] += len(batch)
         await update_progress(status_msg, stats, None, "Waiting 15s")
-        await asyncio.sleep(20)
+        await asyncio.sleep(40)
 
     except FloodWait as e:
         await update_progress(status_msg, stats, None, f"FloodWait Waiting {e.value}s")
