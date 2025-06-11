@@ -667,8 +667,8 @@ async def process_batch(client, batch, chat_id, to_id, stats, status_msg):
                 await copy_message(client, msg, to_id, stats, status_msg)
         
         stats['forwarded'] += len(batch)
-        await update_progress(status_msg, stats, None, "Waiting 10s")
-        await asyncio.sleep(10)
+        await update_progress(status_msg, stats, None, "Waiting 3s")
+        await asyncio.sleep(3)
     except FloodWait as e:
         await update_progress(status_msg, stats, None, f"FloodWait Waiting {e.value}s")
         await asyncio.sleep(e.value)
