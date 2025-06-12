@@ -750,7 +750,7 @@ async def start_forwardings(_, messages):
         logger.error(f"Forwarding error: {str(e)}")"""
     try:
         start_time = time.time()
-        limit = 42463  # Total messages to process
+        limit = 5463  # Total messages to process
         
 
         stats = {
@@ -763,7 +763,7 @@ async def start_forwardings(_, messages):
 
         from_chat_id = -1002537877576
         to_chat_id = -1002751356541
-        current_msg_id = 3600
+        current_msg_id = 37000
 
         while stats['fetched'] < limit:
             remaining = limit - stats['fetched']
