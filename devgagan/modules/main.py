@@ -655,8 +655,11 @@ async def start_forwardingss(_, messages):
         await app.send_message(message.chat.id, "Maximum attempts exceeded. Try later.")
         return
 
-    from_chat_id = await app.ask(message.chat.id, f"send chat id from get messages?, ex:- -1001621034533")
-    to_chat_id = await app.ask(message.chat.id, f"send chat id where do you want send messages?, ex:- -1001621034533")
+    from_chat_ids = await app.ask(message.chat.id, f"send chat id from get messages?, ex:- -1001621034533")
+    from_chat_id = int(from_chat_ids.text.strip())
+    to_chat_ids = await app.ask(message.chat.id, f"send chat id where do you want send messages?, ex:- -1001621034533")
+    to_chat_id = int(to_chat_ids.text.strip())
+    logger.info(f"to_chat_id info: {to_chat_id}")
     try:
         start_time = time.time()
         #limit = 2000  # Total messages to process
@@ -980,7 +983,6 @@ async def cleanup(client, user_id):
     try:
         if client:
             await client.stop()
-        await db.rmve_frwd(user_id)
     except Exception as e:
         logger.error(f"Cleanup error: {str(e)}")
 
