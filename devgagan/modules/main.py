@@ -670,8 +670,8 @@ async def start_forwardingss(_, messages):
             'start_time': start_time
         }
 
-        from_chat_id = -1001621034533
-        to_chat_id = -1002716789704
+        #from_chat_id = -1001621034533
+        #to_chat_id = -1002716789704
         #current_msg_id = 1
 
         while stats['fetched'] < limit:
