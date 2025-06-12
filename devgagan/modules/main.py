@@ -660,6 +660,14 @@ async def start_forwardingss(_, messages):
     to_chat_ids = await app.ask(message.chat.id, f"send chat id where do you want send messages?, ex:- -1001621034533")
     to_chat_id = int(to_chat_ids.text.strip())
     logger.info(f"to_chat_id info: {to_chat_id}")
+
+    frwd_msg = False
+    copy_msgs = await app.ask(message.chat.id, "Send `true` if you want to forward the message, otherwise `false`:")
+    copy_msg = copy_msgs.text.strip().lower()
+    
+    if copy_msg == "true":
+        frwd_msg = True
+        
     try:
         start_time = time.time()
         #limit = 2000  # Total messages to process
@@ -699,9 +707,12 @@ async def start_forwardingss(_, messages):
                     continue
 
                 logger.info(f"Message info: {msg}")
-                batch_to_forward.append(msg.id)
+                if frwd_msg:
+                    batch_to_forward.append(msg.id)
+                else:
+                    copy_message(client, msg, from_chat_id, to_chat_id, stats, message)
 
-            if batch_to_forward:
+            if batch_to_forward and frwd_msg:
                 await process_batchs(client, batch_to_forward, from_chat_id, to_chat_id, stats, message)
 
             current_msg_id += batch_size
@@ -718,6 +729,58 @@ async def start_forwardingss(_, messages):
     finally:
         await cleanup(client, user_id)
 
+
+
+
+
+
+async def copy_message(client, message, chat_id, to_id, stats, status_msg ):
+    try:
+        caption = custom_caption(message)
+        if message.media and caption:
+            await client.send_cached_media(
+                chat_id=to_id,
+                file_id=media(message),
+                caption=caption
+            )
+        else:
+            await client.copy_message(
+                chat_id=to_id,
+                from_chat_id=message.chat.id,
+                message_id=message.id,
+                caption=caption)
+        
+        stats['forwarded'] += 1
+        await update_progress(status_msg, stats, None, "Waiting 20s")
+        await asyncio.sleep(1)
+    except FloodWait as e:
+        await update_progress(status_msg, stats, None, f"FloodWait Waiting {e.value}s")
+        await asyncio.sleep(e.value)
+        await copy_message(client, message, chat_id, to_id, stats, status_msg)
+    except Exception as e:
+        logger.error(f"Copy error: {str(e)}")
+
+
+
+def custom_caption(msg):
+    if not msg or not msg.media:
+        return None
+        
+    media_obj = getattr(msg, msg.media.value, None)
+    if not media_obj:
+        return None
+        
+    file_name = getattr(media_obj, 'file_name', '')
+    file_size = getattr(media_obj, 'file_size', 0)
+    original_caption = getattr(msg, 'caption', '').html if getattr(msg, 'caption', None) else ''
+    
+    return original_caption
+
+def media(msg):
+    if not msg or not msg.media:
+        return None
+    media_obj = getattr(msg, msg.media.value, None)
+    return getattr(media_obj, 'file_id', None) if media_obj else None
 
 
 #-1001621034533
