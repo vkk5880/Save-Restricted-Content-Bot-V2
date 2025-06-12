@@ -710,7 +710,7 @@ async def start_forwardingss(_, messages):
                 if frwd_msg:
                     batch_to_forward.append(msg.id)
                 else:
-                    copy_message(client, msg, from_chat_id, to_chat_id, stats, message)
+                    await copy_message(client, msg, from_chat_id, to_chat_id, stats, message)
 
             if batch_to_forward and frwd_msg:
                 await process_batchs(client, batch_to_forward, from_chat_id, to_chat_id, stats, message)
