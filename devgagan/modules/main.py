@@ -598,18 +598,122 @@ async def batch_link(_, message):
 
 
 
-TEXTS = """📊 **Forwarding Progress**
 
-🧾 **Fetched**: `{fetched}/{total}`
-📤 **Forwarded**: `{forwarded}`
-🗑 **Deleted**: `{deleted}`
+@app.on_message(filters.command("batchblfrw") & filters.private)
+async def start_forwardingss(_, messages):
+    user_id = messages.chat.id
+    max_retries = 3  # Avoid infinite loops
 
-⏱ **Status**: {status}
-🔄 **Progress**: {percentage}% 
-{progress_bar}
-⏳ **ETA**: {eta}
-"""
+    for attempt in range(max_retries):
+        try:
+            message = await app.send_message(user_id, "🔄 Processing...")
+            client = await initialize_userbot(user_id)
+            break  # Success!
+        except FloodWait as e:
+            logger.warning(f"FloodWait triggered: sleeping for {e.value} seconds")
+            await app.send_message(f"⏳ FloodWait: Waiting {e.value}s...")
+            await asyncio.sleep(e.value)
+        except Exception as e:
+            logger.error(f"Initialization error: {str(e)}")
+            await app.send_message(user_id, f"❌ Error: {str(e)}")
+            return
+    else:
+        await app.send_message(user_id, "❌ Too many retries. Try again later.")
+        return
 
+
+
+    for attempt in range(3):
+        num_messages = await app.ask(message.chat.id, f"Send the starting ID of the message?")
+        try:
+            current_msg_id = int(num_messages.text.strip())
+            if 1 <= current_msg_id <= 500000:
+                break
+            raise ValueError()
+        except ValueError:
+            await app.send_message(
+                message.chat.id, 
+                f"Invalid number. Please enter a number between 1 and 500000."
+            )
+    else:
+        await app.send_message(message.chat.id, "Maximum attempts exceeded. Try later.")
+        return
+
+    for attempt in range(3):
+        num_messages = await app.ask(message.chat.id, f"How many messages do you want to process?")
+        try:
+            limit = int(num_messages.text.strip())
+            if 1 <= limit <= 500000:
+                break
+            raise ValueError()
+        except ValueError:
+            await app.send_message(
+                message.chat.id, 
+                f"Invalid number. Please enter a number between 1 and 500000."
+            )
+    else:
+        await app.send_message(message.chat.id, "Maximum attempts exceeded. Try later.")
+        return
+    
+    try:
+        start_time = time.time()
+        #limit = 2000  # Total messages to process
+        
+
+        stats = {
+            'forwarded': 0,
+            'deleted': 0,
+            'fetched': 0,
+            'total': limit,
+            'start_time': start_time
+        }
+
+        from_chat_id = -1001621034533
+        to_chat_id = -1002716789704
+        #current_msg_id = 1
+
+        while stats['fetched'] < limit:
+            remaining = limit - stats['fetched']
+            batch_size = min(100, remaining)
+            batch_ids = list(range(current_msg_id, current_msg_id + batch_size))
+
+            try:
+                messages = await client.get_messages(from_chat_id, message_ids=batch_ids)
+            except Exception as e:
+                logger.error(f"Message fetch error: {str(e)}")
+                break
+
+            batch_to_forward = []
+
+            for msg in messages:
+                if not msg:
+                    continue
+                stats['fetched'] += 1
+                if msg.empty or msg.service:
+                    stats['deleted'] += 1
+                    continue
+                batch_to_forward.append(msg.id)
+
+            if batch_to_forward:
+                await process_batchs(client, batch_to_forward, from_chat_id, to_chat_id, stats, message)
+
+            current_msg_id += batch_size
+
+            if stats['fetched'] % 20 == 0 or stats['fetched'] >= limit:
+                await update_progress(message, stats, limit, 'Forwarding')
+
+        status = 'Completed' if users_loop.get(user_id, False) else 'Cancelled'
+        await update_progress(message, stats, limit, status)
+
+    except Exception as e:
+        logger.error(f"Forwarding error: {str(e)}")
+        await message.edit_text(f"❌ Error: {str(e)}")
+    finally:
+        await cleanup(client, user_id)
+
+
+
+#-1001621034533
 @app.on_message(filters.command("batchfrw") & filters.private)
 async def start_forwardings(_, messages):
     user_id = messages.chat.id
