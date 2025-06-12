@@ -599,7 +599,7 @@ async def batch_link(_, message):
 
 
 
-@app.on_message(filters.command("batchblfrw") & filters.private)
+@app.on_message(filters.command("batchinfo") & filters.private)
 async def start_forwardingss(_, messages):
     user_id = messages.chat.id
     max_retries = 3  # Avoid infinite loops
@@ -654,7 +654,9 @@ async def start_forwardingss(_, messages):
     else:
         await app.send_message(message.chat.id, "Maximum attempts exceeded. Try later.")
         return
-    
+
+    from_chat_id = await app.ask(message.chat.id, f"send chat id from get messages?, ex:- -1001621034533")
+    to_chat_id = await app.ask(message.chat.id, f"send chat id where do you want send messages?, ex:- -1001621034533")
     try:
         start_time = time.time()
         #limit = 2000  # Total messages to process
@@ -692,6 +694,8 @@ async def start_forwardingss(_, messages):
                 if msg.empty or msg.service:
                     stats['deleted'] += 1
                     continue
+
+                logger.info(f"Message info: {msg}")
                 batch_to_forward.append(msg.id)
 
             if batch_to_forward:
